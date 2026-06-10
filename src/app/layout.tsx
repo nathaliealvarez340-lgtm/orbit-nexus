@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ORBIT NEXUS · Automatización fiscal inteligente",
   description: "Convierte tickets en facturas y administra tu operación fiscal.",
+  icons: {
+    icon: "/logo/favicon-orbit.png",
+    shortcut: "/logo/favicon-orbit.png",
+    apple: "/logo/favicon-orbit.png",
+  },
 };
 
 export default function RootLayout({
