@@ -1,35 +1,159 @@
 "use client";
-
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
+import Link from "next/link";
+import { ArrowRight, LoaderCircle } from "lucide-react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-
-const schema = z.object({
-  name: z.string().min(2).optional(),
-  email: z.email("Ingresa un correo válido"),
-  password: z.string().min(8, "Usa al menos 8 caracteres"),
-  confirm: z.string().optional(),
-}).refine((data) => !data.confirm || data.password === data.confirm, { path: ["confirm"], message: "Las contraseñas no coinciden" });
-
-type Values = z.infer<typeof schema>;
+import { authClient } from "@/lib/auth-client";
+import { registerSchema } from "@/lib/validation";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
-  const { register, handleSubmit, formState: { errors, isSubmitSuccessful } } = useForm<Values>({ resolver: zodResolver(schema) });
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [error, setError] = useState("");
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (lock.current) return;
+    const fields = Object.fromEntries(new FormData(e.currentTarget));
+    if (mode === "register") {
+      const result = registerSchema.safeParse(fields);
+      if (!result.success) {
+        setError(result.error.issues[0].message);
+        return;
+      }
+    }
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const credentials = {
+        email: String(fields.email).trim().toLowerCase(),
+        password: String(fields.password),
+      };
+      const response =
+        mode === "register"
+          ? await authClient.signUp.email({
+              ...credentials,
+              name: String(fields.name).trim(),
+            })
+          : await authClient.signIn.email(credentials);
+      if (response.error) {
+        setError(
+          mode === "login"
+            ? "No se pudo iniciar sesión. Revisa tus datos o intenta más tarde."
+            : "No se pudo crear la cuenta. Revisa tus datos o recupera el acceso si ya tienes una.",
+        );
+        return;
+      }
+      window.location.assign(
+        mode === "register" ? "/onboarding" : "/dashboard",
+      );
+    } catch {
+      setError("No se pudo conectar. Intenta nuevamente.");
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
   return (
-    <form onSubmit={handleSubmit(() => undefined)} className="mt-8 space-y-4">
-      {mode === "register" && <Field label="Nombre" error={errors.name?.message}><input {...register("name")} className="input" placeholder="Tu nombre" /></Field>}
-      <Field label="Correo" error={errors.email?.message}><input {...register("email")} className="input" type="email" placeholder="nombre@empresa.com" /></Field>
-      <Field label="Contraseña" error={errors.password?.message}><input {...register("password")} className="input" type="password" placeholder="••••••••" /></Field>
-      {mode === "register" && <Field label="Confirmar contraseña" error={errors.confirm?.message}><input {...register("confirm")} className="input" type="password" placeholder="••••••••" /></Field>}
-      <Button type="submit" className="h-11 w-full">{mode === "login" ? "Iniciar sesión" : "Crear cuenta"} <ArrowRight className="size-4" /></Button>
-      {isSubmitSuccessful && <p className="text-center text-xs text-emerald-400">Demo validada correctamente. La autenticación real se conectará después.</p>}
+    <form onSubmit={submit} className="mt-8 space-y-4">
+      {mode === "register" && (
+        <Field label="Nombre">
+          <input
+            name="name"
+            autoComplete="name"
+            required
+            minLength={2}
+            maxLength={100}
+            className="input"
+            placeholder="Tu nombre"
+          />
+        </Field>
+      )}
+      <Field label="Correo">
+        <input
+          name="email"
+          autoComplete="email"
+          className="input"
+          type="email"
+          required
+          maxLength={254}
+          placeholder="nombre@empresa.com"
+        />
+      </Field>
+      <Field label="Contraseña">
+        <input
+          name="password"
+          autoComplete={
+            mode === "register" ? "new-password" : "current-password"
+          }
+          className="input"
+          type="password"
+          required
+          minLength={mode === "register" ? 12 : 1}
+          maxLength={128}
+          placeholder="••••••••"
+        />
+      </Field>
+      {mode === "register" && (
+        <>
+          <p className="text-xs text-zinc-500">
+            12 caracteres como mínimo, con mayúscula, minúscula y número.
+          </p>
+          <Field label="Confirmar contraseña">
+            <input
+              name="confirm"
+              autoComplete="new-password"
+              className="input"
+              type="password"
+              required
+              placeholder="••••••••"
+            />
+          </Field>
+        </>
+      )}
+      {mode === "login" && (
+        <Link
+          className="block text-right text-xs text-violet-300"
+          href="/forgot-password"
+        >
+          Recuperar contraseña
+        </Link>
+      )}
+      <Button
+        disabled={busy}
+        type="submit"
+        className="h-11 w-full disabled:opacity-50"
+      >
+        {busy
+          ? "Un momento…"
+          : mode === "login"
+            ? "Iniciar sesión"
+            : "Crear cuenta"}
+        {busy ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : (
+          <ArrowRight className="size-4" />
+        )}
+      </Button>
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
+      )}
     </form>
   );
 }
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return <label className="block text-sm text-zinc-400">{label}<div className="mt-2">{children}</div>{error && <span className="mt-1 block text-xs text-red-400">{error}</span>}</label>;
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block text-sm text-zinc-400">
+      {label}
+      <div className="mt-2">{children}</div>
+    </label>
+  );
 }
-

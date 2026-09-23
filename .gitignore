@@ -44,3 +44,6 @@ next-env.d.ts
 # local development
 dev-server.log
 /src/generated/prisma
+/.orbit-local/
+/test-results/
+/playwright-report/

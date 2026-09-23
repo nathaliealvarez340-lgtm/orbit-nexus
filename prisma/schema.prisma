@@ -18,6 +18,158 @@ enum TicketStatus {
   READY
   INVOICED
   ERROR
+  REVIEW
+  REGISTERED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BillingStatus {
+  NOT_REQUESTED
+  READY
+  REQUIRES_DATA
+  REDIRECT_REQUIRED
+  PROCESSING
+  INVOICED
+  FAILED
+}
+
+model Organization {
+  id              String                   @id @default(cuid())
+  name            String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  memberships     Membership[]
+  fiscalProfile   FiscalProfile?
+  fiscalDocuments UploadedFiscalDocument[]
+  tickets         Ticket[]
+  expenses        Expense[]
+  invoices        Invoice[]
+  stampedInvoices StampedInvoice[]
+  activityLogs    ActivityLog[]
+  documents       Document[]
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MembershipRole @default(MEMBER)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model RateLimit {
+  id          String @id @default(cuid())
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
+model RequestLimit {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+model Document {
+  id              String                   @id @default(cuid())
+  organizationId  String
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uploadedById    String
+  fileName        String
+  mimeType        String
+  size            Int
+  sha256          String
+  content         Bytes
+  kind            String
+  createdAt       DateTime                 @default(now())
+  tickets         Ticket[]
+  fiscalDocuments UploadedFiscalDocument[]
+  xmlInvoices     Invoice[]                @relation("InvoiceXml")
+  pdfInvoices     Invoice[]                @relation("InvoicePdf")
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt])
+}
+
+model Expense {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticketId       String        @unique
+  ticket         Ticket        @relation(fields: [organizationId, ticketId], references: [organizationId, id])
+  capturedById   String
+  merchant       String
+  purchaseDate   DateTime      @db.Date
+  total          Decimal       @db.Decimal(12, 2)
+  subtotal       Decimal?      @db.Decimal(12, 2)
+  tax            Decimal?      @db.Decimal(12, 2)
+  category       String?
+  folio          String?
+  details        Json?
+  billingStatus  BillingStatus @default(NOT_REQUESTED)
+  confirmedAt    DateTime      @default(now())
+
+  @@unique([organizationId, ticketId])
+  @@unique([organizationId, id])
+  @@index([organizationId, purchaseDate])
+  @@index([organizationId, billingStatus])
 }
 
 enum InvoiceStatus {
@@ -38,9 +190,14 @@ model User {
   id              String                   @id @default(cuid())
   name            String
   email           String                   @unique
-  passwordHash    String
+  passwordHash    String?
+  emailVerified   Boolean                  @default(false)
+  image           String?
+  sessions        Session[]
+  accounts        Account[]
+  memberships     Membership[]
   type            UserType                 @default(INDIVIDUAL)
-  fiscalProfile   FiscalProfile?
+  fiscalProfiles  FiscalProfile[]
   fiscalDocuments UploadedFiscalDocument[]
   tickets         Ticket[]
   invoices        Invoice[]
@@ -51,85 +208,117 @@ model User {
 }
 
 model FiscalProfile {
-  id           String    @id @default(cuid())
-  userId       String    @unique
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rfc          String    @unique
-  legalName    String
-  fiscalRegime String
-  postalCode   String
-  cfdiUse      String
-  email        String
-  phone        String?
-  address      String?
-  confirmedAt  DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personType     UserType     @default(COMPANY)
+  rfc            String
+  legalName      String
+  fiscalRegime   String
+  postalCode     String
+  cfdiUse        String
+  email          String
+  phone          String?
+  address        String?
+  confirmedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model UploadedFiscalDocument {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fileName      String
-  storageKey    String
-  mimeType      String
-  extractedData Json?
-  isConfirmed   Boolean   @default(false)
-  confirmedAt   DateTime?
-  createdAt     DateTime  @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documentId     String?
+  document       Document?    @relation(fields: [organizationId, documentId], references: [organizationId, id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName       String
+  storageKey     String
+  mimeType       String
+  extractedData  Json?
+  isConfirmed    Boolean      @default(false)
+  confirmedAt    DateTime?
+  createdAt      DateTime     @default(now())
 }
 
 model Ticket {
-  id            String               @id @default(cuid())
-  userId        String
-  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyId     String?
-  company       Company?             @relation(fields: [companyId], references: [id])
-  fileName      String
-  storageKey    String
-  mimeType      String
-  status        TicketStatus         @default(UPLOADED)
-  total         Decimal?             @db.Decimal(12, 2)
-  purchaseDate  DateTime?
-  extractedData TicketExtractedData?
-  invoice       Invoice?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  documentId     String?
+  document       Document?            @relation(fields: [organizationId, documentId], references: [organizationId, id])
+  expense        Expense?
+  billingStatus  BillingStatus        @default(NOT_REQUESTED)
+  merchant       String?
+  userId         String
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId      String?
+  company        Company?             @relation(fields: [companyId], references: [id])
+  fileName       String
+  storageKey     String
+  mimeType       String
+  status         TicketStatus         @default(UPLOADED)
+  total          Decimal?             @db.Decimal(12, 2)
+  purchaseDate   DateTime?
+  extractedData  TicketExtractedData?
+  invoice        Invoice?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
+  @@unique([organizationId, id])
   @@index([userId, status])
   @@index([companyId])
+  @@index([organizationId, createdAt])
 }
 
 model TicketExtractedData {
-  id         String   @id @default(cuid())
-  ticketId   String   @unique
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  provider   String
-  confidence Float
-  fields     Json
-  rawResult  Json?
-  createdAt  DateTime @default(now())
+  id             String   @id @default(cuid())
+  ticketId       String   @unique
+  organizationId String
+  ticket         Ticket   @relation(fields: [organizationId, ticketId], references: [organizationId, id], onDelete: Cascade)
+  provider       String
+  confidence     Float?
+  fields         Json
+  rawResult      Json?
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, ticketId])
 }
 
 model Invoice {
-  id          String           @id @default(cuid())
-  userId      String
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ticketId    String?          @unique
-  ticket      Ticket?          @relation(fields: [ticketId], references: [id])
-  providerId  String?
-  provider    InvoiceProvider? @relation(fields: [providerId], references: [id])
-  status      InvoiceStatus    @default(DRAFT)
-  receiverRfc String
-  subtotal    Decimal          @db.Decimal(12, 2)
-  tax         Decimal          @db.Decimal(12, 2)
-  total       Decimal          @db.Decimal(12, 2)
-  externalId  String?
-  xmlUrl      String?
-  pdfUrl      String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  uuid           String?
+  issuerName     String?
+  issuedAt       DateTime?
+  xmlDocumentId  String?
+  pdfDocumentId  String?
+  xmlDocument    Document?        @relation("InvoiceXml", fields: [organizationId, xmlDocumentId], references: [organizationId, id])
+  pdfDocument    Document?        @relation("InvoicePdf", fields: [organizationId, pdfDocumentId], references: [organizationId, id])
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketId       String?          @unique
+  ticket         Ticket?          @relation(fields: [organizationId, ticketId], references: [organizationId, id])
+  providerId     String?
+  provider       InvoiceProvider? @relation(fields: [providerId], references: [id])
+  status         InvoiceStatus    @default(DRAFT)
+  receiverRfc    String
+  subtotal       Decimal          @db.Decimal(12, 2)
+  tax            Decimal          @db.Decimal(12, 2)
+  total          Decimal          @db.Decimal(12, 2)
+  externalId     String?
+  xmlUrl         String?
+  pdfUrl         String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([organizationId, ticketId])
+  @@unique([organizationId, uuid])
+  @@index([organizationId, createdAt])
 }
 
 model InvoiceProvider {
@@ -156,21 +345,23 @@ model Company {
 }
 
 model StampedInvoice {
-  id          String                  @id @default(cuid())
-  userId      String
-  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  uuid        String?                 @unique
-  status      InvoiceStatus           @default(DRAFT)
-  issuerRfc   String
-  receiverRfc String
-  subtotal    Decimal                 @db.Decimal(12, 2)
-  tax         Decimal                 @db.Decimal(12, 2)
-  total       Decimal                 @db.Decimal(12, 2)
-  concepts    StampedInvoiceConcept[]
-  xmlUrl      String?
-  pdfUrl      String?
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  id             String                  @id @default(cuid())
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uuid           String?                 @unique
+  status         InvoiceStatus           @default(DRAFT)
+  issuerRfc      String
+  receiverRfc    String
+  subtotal       Decimal                 @db.Decimal(12, 2)
+  tax            Decimal                 @db.Decimal(12, 2)
+  total          Decimal                 @db.Decimal(12, 2)
+  concepts       StampedInvoiceConcept[]
+  xmlUrl         String?
+  pdfUrl         String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 }
 
 model StampedInvoiceConcept {
@@ -185,16 +376,19 @@ model StampedInvoiceConcept {
 }
 
 model ActivityLog {
-  id         String   @id @default(cuid())
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action     String
-  entityType String
-  entityId   String?
-  metadata   Json?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  ipAddress      String?
+  createdAt      DateTime     @default(now())
 
   @@index([userId, createdAt])
   @@index([entityType, entityId])
+  @@index([organizationId, createdAt])
 }

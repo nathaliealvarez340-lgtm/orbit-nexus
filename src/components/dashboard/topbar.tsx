@@ -1,17 +1,85 @@
-import { Bell, ChevronDown, Search } from "lucide-react";
-
-export function Topbar() {
+"use client";
+import Link from "next/link";
+import { LogOut, Plus } from "lucide-react";
+import { useState } from "react";
+import { authClient } from "@/lib/auth-client";
+import { OrganizationSwitcher } from "./organization-switcher";
+export function Topbar({
+  user,
+  organizationId,
+  memberships,
+}: {
+  user: { name: string };
+  organizationId: string;
+  memberships: { organization: { id: string; name: string } }[];
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/[.06] bg-[#0c0c0f]/85 px-5 backdrop-blur-xl md:px-8">
-      <div className="flex items-center gap-2 text-sm text-zinc-500"><Search className="size-4" /> Buscar tickets, facturas o empresas...</div>
-      <div className="flex items-center gap-3">
-        <button className="grid size-9 place-items-center rounded-xl border border-white/[.08] text-zinc-400"><Bell className="size-4" /></button>
-        <button className="flex items-center gap-2 rounded-xl border border-white/[.08] p-1.5 pr-3 text-sm">
-          <span className="grid size-7 place-items-center rounded-lg bg-violet-500/20 text-xs font-semibold text-violet-300">NG</span>
-          <span className="hidden sm:inline">Nathalie</span><ChevronDown className="size-3 text-zinc-500" />
-        </button>
+    <header className="sticky top-0 z-30 border-b border-white/[.06] bg-[#0c0c0f]/95 backdrop-blur-xl">
+      <div className="flex min-h-16 items-center justify-between gap-3 px-5 py-2 md:px-8">
+        <div className="flex min-w-0 items-center gap-2">
+          <OrganizationSwitcher
+            memberships={memberships}
+            active={organizationId}
+          />
+          <Link
+            href="/onboarding"
+            aria-label="Crear otra organización"
+            className="p-2 text-zinc-500"
+          >
+            <Plus className="size-4" />
+          </Link>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-sm text-zinc-400 sm:block">
+            {user.name}
+          </span>
+          <button
+            disabled={busy}
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+            className="rounded-xl border border-white/10 p-2.5 text-zinc-400"
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const result = await authClient.signOut();
+                if (result.error) throw new Error();
+                // Discard the authenticated router cache after session revocation.
+                // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                window.location.assign("/login");
+              } catch {
+                setError("No se pudo cerrar sesión.");
+                setBusy(false);
+              }
+            }}
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
       </div>
+      {error && (
+        <p role="alert" className="px-5 text-xs text-red-400">
+          {error}
+        </p>
+      )}
+      <nav
+        aria-label="Navegación móvil"
+        className="flex gap-5 overflow-x-auto border-t border-white/[.05] px-5 py-3 text-xs text-zinc-400 lg:hidden"
+      >
+        {[
+          ["/dashboard", "Resumen"],
+          ["/dashboard/tickets", "Tickets"],
+          ["/dashboard/invoices", "Facturas"],
+          ["/dashboard/fiscal-profile", "Perfil fiscal"],
+          ["/dashboard/fiscal-documents", "Documentos"],
+          ["/dashboard/companies", "Empresas"],
+        ].map(([href, label]) => (
+          <Link key={href} href={href} className="whitespace-nowrap">
+            {label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }
-

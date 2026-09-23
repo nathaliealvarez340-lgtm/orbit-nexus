@@ -9,4 +9,3 @@ export function currency(value: number) {
     maximumFractionDigits: 0,
   }).format(value);
 }
-
