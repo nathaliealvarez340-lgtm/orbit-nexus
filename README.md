@@ -2,6 +2,8 @@
 
 Aplicación Next.js 16.3.5 / React 19 / Prisma 7.10 / PostgreSQL. La landing pública se conserva. El dashboard usa datos persistidos de la organización autorizada, sin fixtures de demostración.
 
+Corrección de autenticación, pruebas y procedimiento de publicación con Neon: [AUTH-VERIFICATION.md](./AUTH-VERIFICATION.md).
+
 ## Arranque
 
 Requiere Node.js 22.12+ (verificado con 24.14.1), npm y PostgreSQL para despliegues reales.
@@ -24,7 +26,7 @@ Base nueva: `npm run db:migrate` ejecuta ambas. Base existente de fase 1: hacer 
 
 La migración crea una organización y membresía OWNER por usuario previo, asigna sus registros y conserva los logs sin usuario en un archivo sin miembros. No convierte importes OCR antiguos en gastos. Los hashes de contraseñas anteriores se conservan pero no se adivina su algoritmo: se requiere recuperación de contraseña por el adaptador de correo para crear credenciales compatibles. Los documentos antiguos que solo tengan `storageKey` requieren una migración desde su almacenamiento original; no se inventan sus bytes.
 
-No se ha aplicado ninguna migración a una base externa desde esta tarea. Las pruebas usan bases aisladas.
+El 23/09/2026 se aplicaron ambas migraciones a Neon después de la eliminación autorizada de la arquitectura legacy respaldada. Ver [NEON-REPLACEMENT-REPORT.md](./NEON-REPLACEMENT-REPORT.md). Los scripts de pruebas habituales siguen usando bases aisladas.
 
 ## Variables
 
@@ -63,9 +65,11 @@ Pendientes externos: proveedor OCR y extracción fiscal, PAC, validación SAT, a
 
 - `npm run lint`
 - `npm run typecheck` (tras `npm ci`; build genera también tipos de rutas)
+- `npm run check:auth-env`: valida el formato de las variables de autenticación, sin mostrar valores ni conectar a la base.
 - `npm test`: validación, contratos y migración con datos heredados en PGlite.
 - `npm run build`
 - `npm run test:e2e`: exige un build previo y Chrome instalado. Arranca Next en producción y una base PGlite efímera, crea usuarios sintéticos y cierra ambos al finalizar. `ORBIT_TEST_PORT` cambia el puerto 3197. No accede a bases de producción ni a OCR/correo reales.
+- `npm run test:auth:e2e`: prueba registro/login reales, cookies, logout, expiración, workspaces y aislamiento con el mismo enfoque aislado. `ORBIT_AUTH_TEST_PORT` cambia el puerto 3198.
 - `npm audit`: los overrides acotados de deepmerge-ts y mysql2 corrigen dependencias del CLI Prisma; generación, build y pruebas se verifican con esas versiones.
 
 E2E cubre UI/API/base de datos, dos tenants, roles, archivos, CFDI, importes, cookies, login/logout, cámara **emulada** y tamaños desktop/laptop/tablet/mobile. Capturas y resumen quedan en `test-results` (ignorado). Cámara física, Safari/iOS y proveedores externos requieren validación en dispositivos/servicios reales.

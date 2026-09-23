@@ -781,13 +781,11 @@ try {
   await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
     "Selecciona JPG",
   );
-  await page
-    .getByLabel("Seleccionar ticket", { exact: true })
-    .setInputFiles({
-      name: "large.png",
-      mimeType: "image/png",
-      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
-    });
+  await page.getByLabel("Seleccionar ticket", { exact: true }).setInputFiles({
+    name: "large.png",
+    mimeType: "image/png",
+    buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+  });
   await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
     "10 MB",
   );
@@ -930,6 +928,9 @@ try {
   await page
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
+  // Logout clears the prior workspace; this user belongs to A and C.
+  await expect(page).toHaveURL(/\/onboarding$/);
+  await page.getByLabel("Organización activa").selectOption(orgA);
   await expect(page).toHaveURL(/\/dashboard$/);
   assert(
     (

@@ -5,11 +5,12 @@ import { createAuthMiddleware, APIError } from "better-auth/api";
 import { getDb } from "./db";
 import { passwordSchema } from "./validation";
 import { z } from "zod";
+import { authOrigin } from "./auth-origin";
 
 function createAuth() {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error("AUTH_NOT_CONFIGURED");
-  const baseURL = process.env.BETTER_AUTH_URL || "http://localhost:3000";
+  const baseURL = authOrigin();
   return betterAuth({
     appName: "ORBIT NEXUS",
     baseURL,

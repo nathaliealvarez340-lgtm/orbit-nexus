@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getAuth } from "./auth";
 import { getDb } from "./db";
 import { ApiError } from "./http";
+import { activeMembership } from "./active-membership";
 
 export const tenantCookie = "orbit.organization";
 export async function requireUser() {
@@ -27,9 +28,7 @@ export async function requireTenant() {
   });
   const active = (await cookies()).get(tenantCookie)?.value;
   // The cookie is a preference only. Membership always authorizes the tenant.
-  const membership = active
-    ? memberships.find((m) => m.organizationId === active)
-    : memberships[0];
+  const membership = activeMembership(memberships, active);
   if (!membership)
     throw new ApiError(409, "Selecciona o crea una organización.");
   return {

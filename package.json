@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --conditions=react-server --import tsx --test tests/*.test.ts",
     "test:e2e": "node scripts/e2e.mjs",
+    "test:auth:e2e": "node scripts/auth-e2e.mjs",
+    "check:auth-env": "node --import tsx scripts/check-auth-env.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "postinstall": "prisma generate"

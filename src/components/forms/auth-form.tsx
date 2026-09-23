@@ -24,6 +24,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     lock.current = true;
     setBusy(true);
     setError("");
+    let navigating = false;
     try {
       const credentials = {
         email: String(fields.email).trim().toLowerCase(),
@@ -44,14 +45,18 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         );
         return;
       }
-      window.location.assign(
-        mode === "register" ? "/onboarding" : "/dashboard",
-      );
+      if (!response.data?.user) throw new Error("SESSION_NOT_CREATED");
+      // Server resolves the session and membership; discard pre-login router cache.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign("/api/auth/continue");
+      navigating = true;
     } catch {
       setError("No se pudo conectar. Intenta nuevamente.");
     } finally {
-      lock.current = false;
-      setBusy(false);
+      if (!navigating) {
+        lock.current = false;
+        setBusy(false);
+      }
     }
   }
   return (

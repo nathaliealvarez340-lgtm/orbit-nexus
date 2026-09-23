@@ -15,6 +15,7 @@ export function OrganizationForm() {
         setBusy(true);
         setError("");
         const name = new FormData(e.currentTarget).get("name");
+        let navigating = false;
         try {
           const res = await fetch("/api/organizations", {
             method: "POST",
@@ -29,11 +30,14 @@ export function OrganizationForm() {
           // A new workspace must not reuse a previously cached tenant layout.
           // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.assign("/dashboard");
+          navigating = true;
         } catch {
           setError("No fue posible conectar.");
         } finally {
-          lock.current = false;
-          setBusy(false);
+          if (!navigating) {
+            lock.current = false;
+            setBusy(false);
+          }
         }
       }}
     >

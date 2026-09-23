@@ -2,6 +2,7 @@ import "server-only";
 import { ZodError } from "zod";
 import { createHash } from "node:crypto";
 import { getDb } from "./db";
+import { authOrigin } from "./auth-origin";
 
 export class ApiError extends Error {
   constructor(
@@ -29,9 +30,7 @@ export function apiError(error: unknown) {
   );
 }
 export function assertSameOrigin(request: Request) {
-  const expected = new URL(
-    process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  ).origin;
+  const expected = authOrigin();
   if (request.headers.get("origin") !== expected)
     throw new ApiError(403, "Origen no permitido.");
 }
