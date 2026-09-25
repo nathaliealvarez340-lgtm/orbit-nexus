@@ -63,6 +63,8 @@ Pendientes externos: proveedor OCR y extracción fiscal, PAC, validación SAT, a
 
 ## Verificación
 
+- `npm run validate`: security check, lint, typecheck, tests y build. Prevención y configuración manual de GitHub: [SECURITY.md](./SECURITY.md).
+- `npm run security:check`: revisa índice Git y archivos locales sin imprimir secretos; también se ejecuta antes de `check:auth-env`.
 - `npm run lint`
 - `npm run typecheck` (tras `npm ci`; build genera también tipos de rutas)
 - `npm run check:auth-env`: valida el formato de las variables de autenticación, sin mostrar valores ni conectar a la base.

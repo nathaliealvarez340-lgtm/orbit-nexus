@@ -22,17 +22,69 @@
 
 # misc
 .DS_Store
+
+# private keys and certificate containers
 *.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_ed25519
+
+# database exports and backups (keep Prisma migration source)
+*.sql
+!/prisma/migrations/**/migration.sql
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.sql.zip
+*.dump.gz
+*.dump.zip
+*.backup.gz
+*.backup.zip
+*.bak.gz
+*.bak.zip
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+*.log.*
+/logs/
 
-# env files (can opt-in for committing if needed)
+# environment files: only the sanitized template belongs in Git
 .env*
+*.env
+*.env.*
 !.env.example
+
+# downloaded credentials, secret scratch files and local tool state
+credentials*.json
+client_secret*.json
+service-account*.json
+*-service-account.json
+application_default_credentials.json
+secrets*.tmp
+secrets*.txt
+secrets*.json
+.secrets/
+.credentials/
+/credentials/
+.aws/
+.azure/
+.gcloud/
+.config/gcloud/
+.ssh/
+.npmrc.local
+.netrc
+_netrc
+.pgpass
+pgpass.conf
 
 # vercel
 .vercel
