@@ -1,3 +1,4 @@
+import { FrequentProviders } from "@/components/dashboard/frequent-providers";
 import Link from "next/link";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TicketTable } from "@/components/dashboard/ticket-table";
@@ -21,6 +22,7 @@ export default async function Page({
         copy="De la captura a la factura, cada paso a la vista."
         action={<Button href="/dashboard/tickets/new">Nuevo ticket</Button>}
       />
+      <FrequentProviders />
       <form className="flex max-w-lg gap-3">
         <input
           aria-label="Buscar tickets por comercio o archivo"

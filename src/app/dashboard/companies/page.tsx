@@ -1,46 +1,44 @@
-import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { invoiceAdapters } from "@/services/invoice-provider/assisted";
 import { requirePageTenant } from "@/lib/tenant";
+import { OrganizationForm } from "@/components/forms/organization-form";
+import { OrganizationSwitcher } from "@/components/dashboard/organization-switcher";
 export default async function Page() {
-  await requirePageTenant();
+  const tenant = await requirePageTenant();
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Cobertura"
-        title="Empresas compatibles"
-        copy="Portales oficiales con facturación asistida. La emisión se completa en el sitio de cada comercio."
+        eyebrow="Administración"
+        title="Empresas"
+        copy="Organizaciones a las que perteneces. Cada empresa conserva sus propios datos."
       />
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {invoiceAdapters.map((c) => (
-          <article className="surface p-5" key={c.id}>
-            <div className="flex justify-between">
-              <span className="grid size-11 place-items-center rounded-xl bg-white/[.05] font-semibold text-violet-300">
-                {c.name.slice(0, 2).toUpperCase()}
-              </span>
-              <span className="text-xs text-violet-300">Asistida</span>
-            </div>
-            <h2 className="mt-6 font-medium">{c.name}</h2>
-            <p className="mt-3 text-xs leading-6 text-zinc-500">
-              Datos del ticket:{" "}
-              {c.requiredFields.map((f) => f.label).join(" · ")}. También
-              necesitas tu perfil fiscal.
-            </p>
-            <a
-              href={c.portalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 flex items-center gap-2 text-xs text-violet-300"
+      <section className="surface p-6">
+        <h2 className="mb-4 font-medium">Empresa activa</h2>
+        <OrganizationSwitcher
+          memberships={tenant.memberships}
+          active={tenant.organizationId}
+        />
+        <ul className="mt-5 space-y-3">
+          {tenant.memberships.map((m) => (
+            <li
+              key={m.organizationId}
+              className="flex flex-wrap justify-between gap-2 border-t border-white/10 pt-3 text-sm"
             >
-              Ver portal oficial <ExternalLink className="size-3" />
-            </a>
-          </article>
-        ))}
+              <span>
+                {m.organization.name}
+                {m.organizationId === tenant.organizationId ? " · Activa" : ""}
+              </span>
+              <span className="text-zinc-400">{m.role}</span>
+            </li>
+          ))}
+        </ul>
       </section>
-      <p className="text-sm text-zinc-500">
-        Otros comercios: integración pendiente. No se ejecutan automatizaciones
-        ni scraping.
-      </p>
+      <section className="surface max-w-xl p-6">
+        <h2 className="font-medium">Crear empresa</h2>
+        <p className="mt-2 text-sm text-zinc-400">
+          Serás propietario de la nueva organización. No hay un límite por plan.
+        </p>
+        <OrganizationForm />
+      </section>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cfdiUses } from "./fiscal-catalogs";
 
 export const passwordSchema = z
   .string()
@@ -69,7 +70,12 @@ export const fiscalSchema = z
     legalName: z.string().trim().min(3).max(200),
     fiscalRegime: z.string().regex(/^\d{3}$/),
     postalCode: z.string().regex(/^\d{5}$/),
-    cfdiUse: z.string().regex(/^[A-Z][0-9]{2}$/),
+    cfdiUse: z
+      .string()
+      .refine(
+        (v) => cfdiUses.some(([code]) => code === v),
+        "Selecciona un uso CFDI válido",
+      ),
     email: z.email().max(254),
     personType: z.enum(["INDIVIDUAL", "COMPANY"]),
     confirmed: z.literal(true, {

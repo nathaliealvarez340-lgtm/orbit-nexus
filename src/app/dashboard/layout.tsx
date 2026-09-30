@@ -5,15 +5,36 @@ import { FloatingCapture } from "@/components/dashboard/floating-capture";
 import { CookieConsent } from "@/components/privacy/cookie-consent";
 import { requirePageTenant } from "@/lib/tenant";
 import { parseConsent } from "@/lib/consent";
+import { getDb } from "@/lib/db";
+import type { CSSProperties } from "react";
+import "./dashboard.css";
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const tenant = await requirePageTenant();
+  const preference = await getDb().userPreference.findUnique({
+    where: { userId: tenant.userId },
+  });
+  const accents = {
+    PURPLE: ["#8b5cf6", "#c4b5fd"],
+    BLUE: ["#3b82f6", "#93c5fd"],
+    ORANGE: ["#f97316", "#fdba74"],
+    RED: ["#ef4444", "#fca5a5"],
+  };
+  const accent = accents[preference?.accent ?? "PURPLE"];
   const consent = parseConsent((await cookies()).get("orbit.consent")?.value);
   return (
-    <div className="min-h-screen bg-[#0c0c0f] text-white">
+    <div
+      className="orbit-app min-h-screen bg-[#0c0c0f] text-white"
+      style={
+        {
+          "--orbit-accent": accent[0],
+          "--orbit-accent-soft": accent[1],
+        } as CSSProperties
+      }
+    >
       <Sidebar />
       <div className="lg:pl-64">
         <Topbar

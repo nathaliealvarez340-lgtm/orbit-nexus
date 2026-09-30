@@ -1,6 +1,7 @@
 import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
 import { apiError, ApiError } from "@/lib/http";
+import { requireInvoicePlan } from "@/services/plans";
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -12,6 +13,18 @@ export async function GET(
       where: { id, organizationId },
     });
     if (!doc) throw new ApiError(404, "Documento no disponible.");
+    // Outgoing invoice assets also retain plan protection through direct URLs.
+    if (
+      doc.kind === "INVOICE_LOGO" ||
+      (await getDb().stampedInvoice.findFirst({
+        where: {
+          organizationId,
+          OR: [{ xmlDocumentId: id }, { pdfDocumentId: id }],
+        },
+        select: { id: true },
+      }))
+    )
+      await requireInvoicePlan();
     const inline =
       doc.mimeType.startsWith("image/") &&
       new URL(request.url).searchParams.get("preview") === "1";

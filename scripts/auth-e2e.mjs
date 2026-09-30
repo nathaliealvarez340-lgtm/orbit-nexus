@@ -141,7 +141,9 @@ try {
   await page.goto("/login");
   await page.getByLabel("Correo", { exact: true }).fill(email);
   await page.getByLabel("Contraseña", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Iniciar sesión", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Iniciar sesión", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/onboarding$/);
   assert.equal(await count("Organization"), 0);
   assert.equal(await count("Session"), 1);
@@ -171,9 +173,7 @@ try {
     orgA,
   );
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Panorama fiscal" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   assert.equal(await count("Session"), 1);
   assert.equal(await page.evaluate(() => Object.keys(localStorage).length), 0);
   pass(
@@ -205,8 +205,7 @@ try {
     .map((h) => h.value.replace(/^([^=]+=)[^;]*/, "$1[hidden]"));
   assert(
     !(await context.cookies()).some(
-      (c) =>
-        c.name === "orbit.organization" || c.name.includes("better-auth."),
+      (c) => c.name === "orbit.organization" || c.name.includes("better-auth."),
     ),
     JSON.stringify({
       remaining: (await context.cookies()).map((c) => ({
@@ -255,9 +254,7 @@ try {
     orgA,
   );
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Panorama fiscal" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   pass(
     "valid login restores session and selects the only authorized organization",
   );
@@ -375,7 +372,7 @@ try {
   const restartedPage = await restarted.newPage();
   await restartedPage.goto("/dashboard");
   await expect(
-    restartedPage.getByRole("heading", { name: "Panorama fiscal" }),
+    restartedPage.getByRole("heading", { name: "Dashboard" }),
   ).toBeVisible();
   await restarted.close();
   await database.db.query(

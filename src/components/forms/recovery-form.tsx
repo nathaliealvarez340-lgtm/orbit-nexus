@@ -1,4 +1,5 @@
 "use client";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { passwordSchema } from "@/lib/validation";
@@ -51,7 +52,7 @@ export function RecoveryForm({ token }: { token?: string }) {
         <>
           <label className="block text-sm text-zinc-400">
             Nueva contraseña
-            <input
+            <PasswordInput
               name="password"
               type="password"
               autoComplete="new-password"
@@ -63,7 +64,7 @@ export function RecoveryForm({ token }: { token?: string }) {
           </label>
           <label className="block text-sm text-zinc-400">
             Confirmar contraseña
-            <input
+            <PasswordInput
               name="confirm"
               type="password"
               autoComplete="new-password"

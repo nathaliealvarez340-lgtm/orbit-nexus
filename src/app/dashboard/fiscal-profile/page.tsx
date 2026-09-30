@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { FiscalForm } from "@/components/forms/fiscal-form";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { requirePageTenant } from "@/lib/tenant";
+import { fiscalProfileComplete, addressFields } from "@/lib/fiscal-catalogs";
 import { getDb } from "@/lib/db";
 export default async function Page({
   searchParams,
@@ -28,6 +29,10 @@ export default async function Page({
         cfdiUse: profile.cfdiUse,
         email: profile.email,
         personType: profile.personType,
+        ...Object.fromEntries(
+          addressFields.map(([key]) => [key, profile[key] ?? ""]),
+        ),
+        csfDocumentId: profile.csfDocumentId ?? "",
       }
     : {};
   const extracted = source?.extractedData as Record<string, string> | null;
@@ -45,6 +50,11 @@ export default async function Page({
             : "Documento recibido. La extracción automática de constancias PDF e imágenes está pendiente de proveedor; completa y confirma los datos manualmente."}
         </div>
       )}
+      <p className="text-sm text-violet-300">
+        {fiscalProfileComplete(profile)
+          ? "Perfil completo · Constancia y dirección registradas"
+          : "Perfil incompleto · Completa la dirección y adjunta la constancia PDF"}
+      </p>
       <FiscalForm
         key={document || profile?.updatedAt.toISOString() || "new"}
         initial={{ ...current, ...extracted }}

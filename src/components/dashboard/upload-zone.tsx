@@ -166,6 +166,12 @@ export function UploadZone({ fiscal = false }: { fiscal?: boolean }) {
   }
   return (
     <div className="space-y-5">
+      {!fiscal && (
+        <p className="text-sm leading-6 text-zinc-400">
+          Asegúrate de que el ticket esté completo, bien iluminado y que toda la
+          información sea legible.
+        </p>
+      )}
       <div className="flex flex-wrap gap-3">
         {!fiscal && (
           <Button variant="secondary" onClick={camera} disabled={busy}>

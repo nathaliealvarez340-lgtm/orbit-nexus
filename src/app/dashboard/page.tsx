@@ -18,7 +18,7 @@ import { money, activityLabels } from "@/lib/display";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  searchParams: Promise<{ year?: string; currency?: string }>;
 }) {
   const tenant = await requirePageTenant();
   const params = await searchParams;
@@ -27,7 +27,12 @@ export default async function DashboardPage({
     Number.isInteger(n) && n >= 2000 && n <= 2100
       ? n
       : new Date().getFullYear();
-  const data = await dashboardData(year);
+  const currency = ["MXN", "USD", "EUR"].includes(params.currency ?? "")
+    ? params.currency!
+    : "MXN";
+  const data = await dashboardData(year, currency);
+  const invoiceMoney = (n: number) =>
+    new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(n);
   const kpis = [
     {
       label: "Gasto total del mes",
@@ -76,7 +81,7 @@ export default async function DashboardPage({
     <div className="space-y-7">
       <PageHeader
         eyebrow={tenant.organization.name}
-        title="Panorama fiscal"
+        title="Dashboard"
         copy="Todo lo importante de tu operación, listo para actuar."
         action={
           <Button href="/dashboard/tickets/new">
@@ -90,6 +95,38 @@ export default async function DashboardPage({
         ))}
       </section>
       <ChartPanels data={data.bars} year={year} />
+      <section
+        aria-label="Métricas de facturación emitida"
+        className="grid gap-4 sm:grid-cols-3"
+      >
+        <KpiCard
+          label="Facturación del mes"
+          value={invoiceMoney(data.issuedMonthTotal)}
+          delta={"Mes actual · " + currency}
+          icon={Wallet}
+          tone="green"
+        />
+        <KpiCard
+          label="Facturación del año"
+          value={invoiceMoney(data.issuedYearTotal)}
+          delta={String(year) + " · " + currency}
+          icon={CalendarDays}
+          tone="green"
+        />
+        <KpiCard
+          label="CFDI de ingreso emitidos"
+          value={String(data.issuedCount)}
+          delta={String(year) + " · " + currency + " · No incluye borradores"}
+          icon={FileCheck2}
+          tone="green"
+        />
+      </section>
+      <ChartPanels
+        data={data.issuedBars}
+        year={year}
+        issued
+        currency={currency}
+      />
       <section className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
         <div className="surface min-w-0 overflow-hidden">
           <div className="flex items-center justify-between p-5">

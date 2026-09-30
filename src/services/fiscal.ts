@@ -5,6 +5,8 @@ import { ApiError, enforceRateLimit } from "@/lib/http";
 import { fiscalSchema } from "@/lib/validation";
 import { validateUpload, UploadValidationError } from "@/lib/upload-validation";
 import { readCfdiReceiver } from "@/lib/cfdi";
+import { z } from "zod";
+import { addressShape } from "@/lib/phase3-validation";
 export async function getFiscalProfile() {
   const { organizationId } = await requireTenant();
   return getDb().fiscalProfile.findFirst({ where: { organizationId } });
@@ -14,8 +16,24 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
   requireAdmin(role);
   await enforceRateLimit("fiscal:" + userId, 20, 60);
   const { confirmed, ...data } = fiscalSchema.parse(input);
+  const extended = z
+    .object({ ...addressShape, csfDocumentId: z.string().max(100).optional() })
+    .parse(input);
+  const { csfDocumentId, ...address } = extended;
   void confirmed;
   return getDb().$transaction(async (tx) => {
+    if (
+      csfDocumentId &&
+      !(await tx.document.findFirst({
+        where: {
+          id: csfDocumentId,
+          organizationId,
+          kind: "CSF",
+          mimeType: "application/pdf",
+        },
+      }))
+    )
+      throw new ApiError(404, "Constancia no disponible para esta empresa.");
     if (
       documentId &&
       !(await tx.uploadedFiscalDocument.findFirst({
@@ -25,8 +43,20 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
       throw new ApiError(404, "Documento no disponible.");
     const result = await tx.fiscalProfile.upsert({
       where: { organizationId },
-      create: { ...data, organizationId, userId, confirmedAt: new Date() },
-      update: { ...data, confirmedAt: new Date() },
+      create: {
+        ...data,
+        ...address,
+        ...(csfDocumentId ? { csfDocumentId } : {}),
+        organizationId,
+        userId,
+        confirmedAt: new Date(),
+      },
+      update: {
+        ...data,
+        ...address,
+        ...(csfDocumentId ? { csfDocumentId } : {}),
+        confirmedAt: new Date(),
+      },
     });
     if (documentId)
       await tx.uploadedFiscalDocument.updateMany({

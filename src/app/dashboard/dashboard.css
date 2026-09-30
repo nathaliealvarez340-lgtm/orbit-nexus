@@ -1,0 +1,51 @@
+.orbit-app {
+  color-scheme: dark;
+  --orbit-accent: #8b5cf6;
+  --orbit-accent-soft: #c4b5fd;
+}
+.orbit-app :is(.text-zinc-500, .text-zinc-600) {
+  color: #a1a1aa;
+}
+.orbit-app [class*="text-violet-"] {
+  color: var(--orbit-accent-soft);
+}
+.orbit-app [class*="accent-violet-"] {
+  accent-color: var(--orbit-accent);
+}
+.orbit-app :is(input, select, textarea, button, a, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--orbit-accent);
+  outline-offset: 3px;
+}
+.orbit-app .input {
+  min-width: 0;
+}
+.orbit-app .input:focus {
+  border-color: var(--orbit-accent);
+}
+.orbit-app th,
+.orbit-app td {
+  padding: 0.85rem;
+  text-align: left;
+}
+.orbit-app th {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  font-weight: 500;
+}
+.orbit-app td {
+  border-top: 1px solid #ffffff0d;
+  font-size: 0.875rem;
+}
+.orbit-app select option {
+  background: #18181b;
+  color: white;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-app *,
+  .orbit-app *::before,
+  .orbit-app *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

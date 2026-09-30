@@ -21,8 +21,9 @@ En equipos Windows con CA corporativa, `NODE_USE_SYSTEM_CA=1` permite usar el al
 
 - `202609200001_phase1`: esquema original conservado como baseline.
 - `202609200002_multitenant`: organizaciones, membresías, sesiones, cuentas, documentos privados, gastos y límites de solicitudes; adapta las relaciones existentes a claves compuestas por organización.
+- `202609270001_phase3`: clientes, preferencias, suscripción por organización, reportes, notificaciones y preparación de facturas; únicamente añade tablas, columnas y restricciones. Probada localmente; pendiente en Neon.
 
-Base nueva: `npm run db:migrate` ejecuta ambas. Base existente de fase 1: hacer backup, verificar que el esquema coincide con `prisma/phase1.prisma`, registrar **solo ese baseline ya presente** con `npx prisma migrate resolve --applied 202609200001_phase1` y después `npm run db:migrate`. No marcar el baseline en una base vacía. Probar primero una copia/staging; no usar `db push`, reset ni recrear tablas.
+Base nueva: `npm run db:migrate` ejecuta las tres migraciones. Base existente de fase 1: hacer backup, verificar que el esquema coincide con `prisma/phase1.prisma`, registrar **solo ese baseline ya presente** con `npx prisma migrate resolve --applied 202609200001_phase1` y después `npm run db:migrate`. No marcar el baseline en una base vacía. Probar primero una copia/staging; no usar `db push`, reset ni recrear tablas.
 
 La migración crea una organización y membresía OWNER por usuario previo, asigna sus registros y conserva los logs sin usuario en un archivo sin miembros. No convierte importes OCR antiguos en gastos. Los hashes de contraseñas anteriores se conservan pero no se adivina su algoritmo: se requiere recuperación de contraseña por el adaptador de correo para crear credenciales compatibles. Los documentos antiguos que solo tengan `storageKey` requieren una migración desde su almacenamiento original; no se inventan sus bytes.
 
@@ -30,24 +31,24 @@ El 23/09/2026 se aplicaron ambas migraciones a Neon después de la eliminación 
 
 ## Variables
 
-| Variable | Uso |
-|---|---|
-| `DATABASE_URL` | PostgreSQL privado, con TLS según el proveedor |
-| `BETTER_AUTH_URL` | Origen exacto, sin comodines; valida cookies, redirecciones y CSRF |
-| `BETTER_AUTH_SECRET` | Secreto aleatorio del servidor, mínimo 32 caracteres |
-| `OCR_API_URL` | Endpoint de un adaptador OCR de confianza; ausente = captura manual explícita |
-| `OCR_API_TOKEN` | Token Bearer del adaptador OCR, si lo requiere |
-| `MAIL_API_URL` / `MAIL_API_TOKEN` | Endpoint y token Bearer para recuperación de contraseña |
+| Variable                          | Uso                                                                           |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `DATABASE_URL`                    | PostgreSQL privado, con TLS según el proveedor                                |
+| `BETTER_AUTH_URL`                 | Origen exacto, sin comodines; valida cookies, redirecciones y CSRF            |
+| `BETTER_AUTH_SECRET`              | Secreto aleatorio del servidor, mínimo 32 caracteres                          |
+| `OCR_API_URL`                     | Endpoint de un adaptador OCR de confianza; ausente = captura manual explícita |
+| `OCR_API_TOKEN`                   | Token Bearer del adaptador OCR, si lo requiere                                |
+| `MAIL_API_URL` / `MAIL_API_TOKEN` | Endpoint y token Bearer para recuperación de contraseña                       |
 
 Todos se leen solo en servidor. `.env*` está ignorado excepto `.env.example`. No se guardan tokens de sesión en localStorage. No hay claves PAC activas: ningún código invoca un PAC.
 
 ## Flujos y límites
 
-Registro/login → creación/selección de organización → captura por cámara o archivo → análisis → revisión editable → **Confirmar y registrar** → Expense → métricas mensuales. Analizar jamás crea un gasto. Confirmar es transaccional e idempotente. Los gastos y la gráfica usan la fecha de compra; el total del mes usa America/Mexico_City. Todos los importes actuales son MXN. Los cuatro contadores de tickets/facturas son históricos de la organización, etiquetados como tales.
+Registro/login → creación/selección de organización → captura por cámara o archivo → análisis → revisión editable → **Confirmar y registrar** → Expense → métricas mensuales. Analizar jamás crea un gasto. Confirmar es transaccional e idempotente. Los gastos y la gráfica usan la fecha de compra; el total del mes usa America/Mexico_City. Los gastos usan MXN. La facturación emitida se consulta por moneda, sin conversiones ni sumas entre monedas. Los cuatro contadores de tickets/facturas son históricos de la organización, etiquetados como tales.
 
 JPG/JPEG/PNG/WEBP/PDF: hasta 10 MB, extensión, MIME y firma comprobados en servidor, tamaño y formato en cliente, petición multipart acotada. XML: hasta 1 MB, sin DTD/entidades, CFDI 4.0 y namespaces correctos. Documentos en PostgreSQL, descargados tras comprobar membresía y organización; sin URLs públicas. Cámara exige HTTPS o localhost y permisos; ante ausencia/denegación permite subir archivo.
 
-Facturación asistida: adaptadores para portales oficiales de OXXO, Walmart y Costco, validación de datos, referencias editables y copia de datos. Abrir un portal no transmite datos automáticamente ni marca como facturado. Un XML de CFDI incorporado expresamente y validado contra RFC receptor/importe del gasto actualiza ticket/gasto/factura y ActivityLog. PDF opcional como adjunto, sin afirmar que su contenido fue cotejado con XML. El UUID se normaliza. La comprobación criptográfica y de vigencia ante SAT sigue pendiente. La pantalla de timbrado es una calculadora local explícita; no guarda ni emite un CFDI.
+Facturación asistida: adaptadores para portales oficiales de OXXO, Walmart y Costco, validación de datos, referencias editables y copia de datos. Abrir un portal no transmite datos automáticamente ni marca como facturado. Un XML de CFDI incorporado expresamente y validado contra RFC receptor/importe del gasto actualiza ticket/gasto/factura y ActivityLog. PDF opcional como adjunto, sin afirmar que su contenido fue cotejado con XML. El UUID se normaliza. La comprobación criptográfica y de vigencia ante SAT sigue pendiente. La antigua ruta de timbrado redirige a Nueva factura: guarda borradores reales en StampedInvoice, sin emitir CFDI ni llamar a un PAC.
 
 El perfil fiscal requiere confirmación y rol OWNER/ADMIN. XML puede proponer datos del receptor; PDF/imagen requieren revisión manual mientras no se conecte extracción fiscal. La aplicación no incluye aún invitaciones/administración de miembros; el modelo y autorización de MEMBER están cubiertos por pruebas.
 
@@ -81,3 +82,13 @@ E2E cubre UI/API/base de datos, dos tenants, roles, archivos, CFDI, importes, co
 Configurar HTTPS, base con copias de seguridad/cifrado y sus credenciales, cuotas/retención de documentos y limpieza periódica de límites expirados, observabilidad sin datos personales, recuperación por correo y procedimientos de soporte. El almacenamiento en DB es funcional pero conviene mover grandes volúmenes a almacenamiento privado con análisis antimalware. Los límites del proxy/plataforma deben permitir multipart de 10 MB (11 MB para XML+PDF); plataformas con límites menores necesitan upload privado directo con validación posterior. Migraciones probadas en PGlite deben ensayarse también contra la versión de PostgreSQL del despliegue.
 
 También puede ejecutarse `node scripts/verify-schema.mjs`: aplica las migraciones en una base aislada y compara el resultado con `prisma/schema.prisma` usando `prisma migrate diff --exit-code`. No escribe en la base configurada del despliegue.
+
+## Fase 3 y QA local
+
+- `npm run test:phase3:e2e`: build previo, Chrome y PostgreSQL PGlite efímero; puerto 3199. Comprueba UI/API/datos, cierres concurrentes, PDF/XLSX, secuencias, planes, archivos privados, aislamiento y accesibilidad con axe. No usa la base indicada en `.env`.
+- `Subscription` pertenece a la organización; ausencia de registro equivale a FREE. No existe una API pública para autoasignar PRO/MAX. Activación comercial y cobros quedan pendientes.
+- `Invoice` conserva los CFDI recibidos de tickets; `StampedInvoice` gestiona facturas a clientes. Solo ISSUED con UUID y fecha de emisión cuenta como emitido; la aplicación únicamente crea DRAFT.
+- Reportes: un snapshot por empresa/año/mes cerrado, desde el primer gasto o la creación de la empresa. Se generan al consultar Reportes y conservan su corte; registros tardíos no reescriben cierres existentes. PDF y Excel se descargan con autorización de tenant.
+- Las notificaciones se materializan desde eventos auditados recientes, tienen lectura por usuario y se limitan a los 200 eventos más recientes en pantalla. Clientes muestra hasta 500 resultados y permite buscar.
+- Perfil completo requiere dirección y CSF PDF privada. Un perfil antiguo puede guardarse incompleto, pero no preparar nuevas facturas a clientes.
+- No se requieren variables de entorno nuevas. La migración de Fase 3 debe ensayarse en una copia de PostgreSQL de producción y aplicarse, con respaldo e historial verificado, antes de publicar este código. En esta tarea no se ejecutan esos pasos en Neon.

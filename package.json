@@ -18,7 +18,8 @@
     "check:auth-env": "node --import tsx scripts/check-auth-env.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:phase3:e2e": "node scripts/phase3-e2e.mjs"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.5",
@@ -26,17 +27,20 @@
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "better-auth": "^1.7.5",
+    "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.1",
     "framer-motion": "^12.40.0",
     "gsap": "^3.15.0",
     "lucide-react": "^1.17.0",
     "next": "16.3.5",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.78.0",
     "recharts": "^3.8.1",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
     "zod": "^4.4.3"
   },
   "overrides": {
@@ -45,9 +49,13 @@
     },
     "prisma": {
       "mysql2": "3.24.4"
+    },
+    "exceljs": {
+      "uuid": "11.1.1"
     }
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@electric-sql/pglite": "^0.4.1",
     "@electric-sql/pglite-socket": "^0.1.1",
     "@playwright/test": "^1.63.0",

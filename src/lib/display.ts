@@ -23,6 +23,11 @@ export const billingStatuses: Record<string, string> = {
   FAILED: "Falló",
 };
 export const activityLabels: Record<string, string> = {
+  CLIENT_CREATED: "Cliente creado",
+  CLIENT_UPDATED: "Cliente actualizado",
+  CLIENT_ARCHIVED: "Cliente archivado",
+  INVOICE_DRAFT_CREATED: "Borrador de factura creado",
+  INVOICE_SETTINGS_UPDATED: "Configuración de facturas actualizada",
   USER_REGISTERED: "Cuenta y organización creadas",
   ORGANIZATION_CREATED: "Organización creada",
   LOGIN: "Inicio de sesión",

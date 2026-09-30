@@ -52,6 +52,11 @@ model Organization {
   stampedInvoices StampedInvoice[]
   activityLogs    ActivityLog[]
   documents       Document[]
+  subscription    Subscription?
+  clients         Client[]
+  invoiceSettings InvoiceSettings?
+  reports         MonthlyExpenseReport[]
+  notifications   Notification[]
 }
 
 model Membership {
@@ -143,6 +148,10 @@ model Document {
   fiscalDocuments UploadedFiscalDocument[]
   xmlInvoices     Invoice[]                @relation("InvoiceXml")
   pdfInvoices     Invoice[]                @relation("InvoicePdf")
+  csfProfiles     FiscalProfile[]          @relation("FiscalCsf")
+  invoiceSettings InvoiceSettings[]        @relation("InvoiceLogo")
+  outgoingXml     StampedInvoice[]         @relation("OutgoingXml")
+  outgoingPdf     StampedInvoice[]         @relation("OutgoingPdf")
 
   @@unique([organizationId, id])
   @@index([organizationId, createdAt])
@@ -187,24 +196,26 @@ enum CompatibilityLevel {
 }
 
 model User {
-  id              String                   @id @default(cuid())
-  name            String
-  email           String                   @unique
-  passwordHash    String?
-  emailVerified   Boolean                  @default(false)
-  image           String?
-  sessions        Session[]
-  accounts        Account[]
-  memberships     Membership[]
-  type            UserType                 @default(INDIVIDUAL)
-  fiscalProfiles  FiscalProfile[]
-  fiscalDocuments UploadedFiscalDocument[]
-  tickets         Ticket[]
-  invoices        Invoice[]
-  stampedInvoices StampedInvoice[]
-  activityLogs    ActivityLog[]
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  id                String                   @id @default(cuid())
+  name              String
+  email             String                   @unique
+  passwordHash      String?
+  preference        UserPreference?
+  notificationReads NotificationRead[]
+  emailVerified     Boolean                  @default(false)
+  image             String?
+  sessions          Session[]
+  accounts          Account[]
+  memberships       Membership[]
+  type              UserType                 @default(INDIVIDUAL)
+  fiscalProfiles    FiscalProfile[]
+  fiscalDocuments   UploadedFiscalDocument[]
+  tickets           Ticket[]
+  invoices          Invoice[]
+  stampedInvoices   StampedInvoice[]
+  activityLogs      ActivityLog[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 }
 
 model FiscalProfile {
@@ -222,6 +233,16 @@ model FiscalProfile {
   email          String
   phone          String?
   address        String?
+  street         String?
+  exteriorNumber String?
+  interiorNumber String?
+  colony         String?
+  locality       String?
+  municipality   String?
+  state          String?
+  country        String       @default("MEX")
+  csfDocumentId  String?
+  csfDocument    Document?    @relation("FiscalCsf", fields: [organizationId, csfDocumentId], references: [organizationId, id])
   confirmedAt    DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -345,23 +366,45 @@ model Company {
 }
 
 model StampedInvoice {
-  id             String                  @id @default(cuid())
-  organizationId String
-  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  uuid           String?                 @unique
-  status         InvoiceStatus           @default(DRAFT)
-  issuerRfc      String
-  receiverRfc    String
-  subtotal       Decimal                 @db.Decimal(12, 2)
-  tax            Decimal                 @db.Decimal(12, 2)
-  total          Decimal                 @db.Decimal(12, 2)
-  concepts       StampedInvoiceConcept[]
-  xmlUrl         String?
-  pdfUrl         String?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id               String                  @id @default(cuid())
+  organizationId   String
+  organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uuid             String?                 @unique
+  status           InvoiceStatus           @default(DRAFT)
+  clientId         String?
+  client           Client?                 @relation(fields: [organizationId, clientId], references: [organizationId, id])
+  folio            String?
+  sequence         Int?
+  invoiceDate      DateTime?               @db.Date
+  issuedAt         DateTime?
+  currency         String                  @default("MXN")
+  documentType     String                  @default("I")
+  cfdiUse          String?
+  paymentForm      String?
+  paymentMethod    String?
+  issuerSnapshot   Json?
+  receiverSnapshot Json?
+  templateSnapshot Json?
+  xmlDocumentId    String?
+  pdfDocumentId    String?
+  xmlDocument      Document?               @relation("OutgoingXml", fields: [organizationId, xmlDocumentId], references: [organizationId, id])
+  pdfDocument      Document?               @relation("OutgoingPdf", fields: [organizationId, pdfDocumentId], references: [organizationId, id])
+  issuerRfc        String
+  receiverRfc      String
+  subtotal         Decimal                 @db.Decimal(12, 2)
+  tax              Decimal                 @db.Decimal(12, 2)
+  total            Decimal                 @db.Decimal(12, 2)
+  concepts         StampedInvoiceConcept[]
+  xmlUrl           String?
+  pdfUrl           String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, folio])
+  @@index([organizationId, issuedAt])
 }
 
 model StampedInvoiceConcept {
@@ -369,10 +412,130 @@ model StampedInvoiceConcept {
   stampedInvoiceId String
   stampedInvoice   StampedInvoice @relation(fields: [stampedInvoiceId], references: [id], onDelete: Cascade)
   description      String
+  productCode      String         @default("01010101")
+  unitCode         String         @default("ACT")
   quantity         Decimal        @db.Decimal(12, 4)
   unitPrice        Decimal        @db.Decimal(12, 2)
   taxRate          Decimal        @db.Decimal(5, 4)
   total            Decimal        @db.Decimal(12, 2)
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  MAX
+}
+
+enum AccentColor {
+  PURPLE
+  BLUE
+  ORANGE
+  RED
+}
+
+model Subscription {
+  organizationId String           @id
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan           SubscriptionPlan @default(FREE)
+  updatedAt      DateTime         @updatedAt
+}
+
+model UserPreference {
+  userId String      @id
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accent AccentColor @default(PURPLE)
+}
+
+model Client {
+  id                 String           @id @default(cuid())
+  organizationId     String
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rfc                String
+  legalName          String
+  personType         UserType         @default(COMPANY)
+  internalNumber     String?
+  foreignTaxId       String?
+  fiscalRegime       String
+  cfdiUse            String
+  defaultPaymentForm String           @default("99")
+  phone              String?
+  email              String
+  additionalEmails   String[]         @default([])
+  notes              String?
+  postalCode         String
+  street             String?
+  exteriorNumber     String?
+  interiorNumber     String?
+  colony             String?
+  locality           String?
+  municipality       String?
+  state              String?
+  country            String           @default("MEX")
+  reference          String?
+  archivedAt         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  invoices           StampedInvoice[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, archivedAt])
+}
+
+model InvoiceSettings {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  prefix         String       @default("ORB")
+  nextNumber     Int          @default(1)
+  color          String       @default("#8b5cf6")
+  template       String       @default("CLASSIC")
+  logoDocumentId String?
+  logoDocument   Document?    @relation("InvoiceLogo", fields: [organizationId, logoDocumentId], references: [organizationId, id])
+  updatedAt      DateTime     @updatedAt
+}
+
+model MonthlyExpenseReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  year           Int
+  month          Int
+  total          Decimal      @db.Decimal(16, 2)
+  ticketCount    Int
+  invoiceCount   Int
+  pendingCount   Int
+  snapshot       Json
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, year, month])
+  @@index([organizationId, createdAt])
+}
+
+model Notification {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventKey       String
+  title          String
+  message        String
+  href           String
+  type           String
+  createdAt      DateTime           @default(now())
+  reads          NotificationRead[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, eventKey])
+  @@index([organizationId, createdAt])
+}
+
+model NotificationRead {
+  organizationId String
+  notificationId String
+  userId         String
+  notification   Notification @relation(fields: [organizationId, notificationId], references: [organizationId, id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+
+  @@id([notificationId, userId])
 }
 
 model ActivityLog {

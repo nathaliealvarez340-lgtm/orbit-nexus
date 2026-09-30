@@ -3,6 +3,9 @@ export interface InvoiceProviderAdapter {
   name: string;
   aliases: string[];
   portalUrl: string;
+  domain: string;
+  billingPortalUrl: string;
+  state: "ASSISTED";
   requiredFields: Array<{ key: string; label: string }>;
   validate(values: Record<string, string>): string[];
   queryStatus(): Promise<"REDIRECT_REQUIRED">;
@@ -48,6 +51,9 @@ const definitions = [
 export const invoiceAdapters: InvoiceProviderAdapter[] = definitions.map(
   (d) => ({
     ...d,
+    domain: new URL(d.portalUrl).hostname,
+    billingPortalUrl: d.portalUrl,
+    state: "ASSISTED",
     validate(values) {
       return this.requiredFields
         .filter((f) => !values[f.key]?.trim())

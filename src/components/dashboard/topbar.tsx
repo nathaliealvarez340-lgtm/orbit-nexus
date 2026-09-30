@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { MobileNavigation } from "./mobile-navigation";
 import { OrganizationSwitcher } from "./organization-switcher";
 export function Topbar({
   user,
@@ -19,12 +20,13 @@ export function Topbar({
     <header className="sticky top-0 z-30 border-b border-white/[.06] bg-[#0c0c0f]/95 backdrop-blur-xl">
       <div className="flex min-h-16 items-center justify-between gap-3 px-5 py-2 md:px-8">
         <div className="flex min-w-0 items-center gap-2">
+          <MobileNavigation />
           <OrganizationSwitcher
             memberships={memberships}
             active={organizationId}
           />
           <Link
-            href="/onboarding"
+            href="/dashboard/companies"
             aria-label="Crear otra organización"
             className="p-2 text-zinc-500"
           >
@@ -39,7 +41,7 @@ export function Topbar({
             disabled={busy}
             aria-label="Cerrar sesión"
             title="Cerrar sesión"
-            className="rounded-xl border border-white/10 p-2.5 text-zinc-400"
+            className="rounded-xl border border-white/10 p-2.5 text-zinc-400 lg:hidden"
             onClick={async () => {
               setBusy(true);
               try {
@@ -63,23 +65,6 @@ export function Topbar({
           {error}
         </p>
       )}
-      <nav
-        aria-label="Navegación móvil"
-        className="flex gap-5 overflow-x-auto border-t border-white/[.05] px-5 py-3 text-xs text-zinc-400 lg:hidden"
-      >
-        {[
-          ["/dashboard", "Resumen"],
-          ["/dashboard/tickets", "Tickets"],
-          ["/dashboard/invoices", "Facturas"],
-          ["/dashboard/fiscal-profile", "Perfil fiscal"],
-          ["/dashboard/fiscal-documents", "Documentos"],
-          ["/dashboard/companies", "Empresas"],
-        ].map(([href, label]) => (
-          <Link key={href} href={href} className="whitespace-nowrap">
-            {label}
-          </Link>
-        ))}
-      </nav>
     </header>
   );
 }

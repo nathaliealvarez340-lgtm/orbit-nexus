@@ -2,12 +2,13 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { cfdiUses, addressFields } from "@/lib/fiscal-catalogs";
+import { PrivateAsset } from "./private-asset";
 const fields = [
   ["rfc", "RFC", "text"],
   ["legalName", "Razón social", "text"],
   ["fiscalRegime", "Régimen fiscal (clave de 3 dígitos)", "text"],
   ["postalCode", "Código postal fiscal", "text"],
-  ["cfdiUse", "Uso CFDI predeterminado (clave)", "text"],
   ["email", "Correo fiscal", "email"],
 ];
 export function FiscalForm({
@@ -19,6 +20,7 @@ export function FiscalForm({
   documentId?: string;
   readOnly?: boolean;
 }) {
+  const [csf, setCsf] = useState(initial.csfDocumentId || "");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const lock = useRef(false);
@@ -41,6 +43,7 @@ export function FiscalForm({
               ...values,
               confirmed: values.confirmed === "on",
               documentId,
+              csfDocumentId: csf || undefined,
             }),
           });
           const data = await res.json();
@@ -88,6 +91,46 @@ export function FiscalForm({
               <option value="COMPANY">Persona moral</option>
             </select>
           </label>
+          <label className="text-sm text-zinc-400">
+            Uso CFDI predeterminado
+            <select
+              name="cfdiUse"
+              className="input mt-2"
+              defaultValue={initial.cfdiUse || "G03"}
+            >
+              {cfdiUses.map(([code, label]) => (
+                <option key={code} value={code}>
+                  {code} · {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {addressFields.map(([name, label]) => (
+            <label key={name} className="text-sm text-zinc-400">
+              {label}
+              <input
+                name={name}
+                className="input mt-2"
+                maxLength={200}
+                defaultValue={
+                  initial[name] || (name === "country" ? "MEX" : "")
+                }
+              />
+            </label>
+          ))}
+        </div>
+        <div className="mt-6">
+          <PrivateAsset
+            kind="CSF"
+            value={csf}
+            onChange={setCsf}
+            disabled={readOnly || busy}
+          />
+          <p className="mt-2 text-xs text-zinc-400">
+            La dirección completa y la constancia son obligatorias para preparar
+            facturas. Puedes guardar un perfil incompleto para completarlo
+            después.
+          </p>
         </div>
         <label className="mt-6 flex items-start gap-3 text-sm text-zinc-400">
           <input

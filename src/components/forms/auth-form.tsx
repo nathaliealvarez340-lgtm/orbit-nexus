@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { ArrowRight, LoaderCircle } from "lucide-react";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
@@ -86,7 +87,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         />
       </Field>
       <Field label="Contraseña">
-        <input
+        <PasswordInput
           name="password"
           autoComplete={
             mode === "register" ? "new-password" : "current-password"
@@ -105,7 +106,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             12 caracteres como mínimo, con mayúscula, minúscula y número.
           </p>
           <Field label="Confirmar contraseña">
-            <input
+            <PasswordInput
               name="confirm"
               autoComplete="new-password"
               className="input"

@@ -103,11 +103,17 @@ try {
       navigator.mediaDevices,
     );
     window.__cameraStreams = [];
+    window.__cameraFailures = [];
     if (original)
       navigator.mediaDevices.getUserMedia = async (...args) => {
-        const stream = await original(...args);
-        window.__cameraStreams.push(stream);
-        return stream;
+        try {
+          const stream = await original(...args);
+          window.__cameraStreams.push(stream);
+          return stream;
+        } catch (error) {
+          window.__cameraFailures.push(error.name);
+          throw error;
+        }
       };
   });
   const errors = [];
@@ -143,9 +149,7 @@ try {
     .getByRole("button", { name: "Crear organización", exact: true })
     .click();
   await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
-  await expect(
-    page.getByRole("heading", { name: "Panorama fiscal" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   const cookies = await context.cookies();
   const sessionCookie = cookies.find((c) => c.name.endsWith("session_token"));
   assert(sessionCookie?.httpOnly);
@@ -683,7 +687,10 @@ try {
   );
   await page.goto("/dashboard?year=" + (testYear - 1));
   await expect(page.getByText("$75.25", { exact: true }).first()).toBeVisible();
-  await page.getByText("Ver importes mensuales", { exact: true }).click();
+  await page
+    .getByText("Ver importes mensuales", { exact: true })
+    .first()
+    .click();
   await expect(
     page.locator("dl").getByText("$75.25", { exact: true }),
   ).toBeVisible();
@@ -702,7 +709,7 @@ try {
     await page.setViewportSize({ width, height });
     await page.goto("/dashboard");
     await expect(
-      page.getByRole("heading", { name: "Panorama fiscal" }),
+      page.getByRole("heading", { name: "Dashboard" }),
     ).toBeVisible();
     assert(
       await page.evaluate(
@@ -739,7 +746,15 @@ try {
     ),
   );
   await page.getByRole("button", { name: "Repetir foto", exact: true }).click();
-  await expect(page.locator("video")).toBeVisible();
+  try {
+    await expect(page.locator("video")).toBeVisible();
+  } catch (error) {
+    console.error(
+      "Emulated camera error categories:",
+      await page.evaluate(() => window.__cameraFailures),
+    );
+    throw error;
+  }
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect
@@ -828,6 +843,8 @@ try {
     "/terms",
   ]) {
     await page.goto(route);
+    if (route === "/dashboard/stamping")
+      await expect(page).toHaveURL(/\/dashboard\/invoices\/new$/);
     assert(!(await page.locator("[data-nextjs-dialog]").count()));
     assert(
       await page.evaluate(

@@ -8,17 +8,24 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { money } from "@/lib/display";
 export function SpendChart({
   data,
+  issued = false,
+  currency = "MXN",
 }: {
   data: { month: string; total: number }[];
+  issued?: boolean;
+  currency?: string;
 }) {
   return (
     <div
       className="h-72 min-w-0"
       role="img"
-      aria-label="Gastos confirmados por mes en pesos mexicanos"
+      aria-label={
+        issued
+          ? "Facturación emitida por mes en " + currency
+          : "Gastos confirmados por mes en pesos mexicanos"
+      }
     >
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <BarChart
@@ -50,11 +57,17 @@ export function SpendChart({
               border: "1px solid #333",
               borderRadius: 12,
             }}
-            formatter={(value) => [money(Number(value)), "Gasto"]}
+            formatter={(value) => [
+              new Intl.NumberFormat("es-MX", {
+                style: "currency",
+                currency,
+              }).format(Number(value)),
+              issued ? "Facturación" : "Gasto",
+            ]}
           />
           <Bar
             dataKey="total"
-            fill="#8b5cf6"
+            fill="var(--orbit-accent, #8b5cf6)"
             radius={[5, 5, 0, 0]}
             maxBarSize={42}
             isAnimationActive={false}

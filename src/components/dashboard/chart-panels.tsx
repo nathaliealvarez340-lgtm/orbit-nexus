@@ -10,26 +10,38 @@ const SpendChart = dynamic(() => import("./charts").then((m) => m.SpendChart), {
 export function ChartPanels({
   data,
   year,
+  issued = false,
+  currency = "MXN",
 }: {
   data: { month: string; total: number }[];
   year: number;
+  issued?: boolean;
+  currency?: string;
 }) {
   const empty = data.every((d) => d.total === 0);
   return (
     <section className="surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium">Gasto registrado por mes</p>
+          <p className="text-sm font-medium">
+            {issued ? "Facturación por mes" : "Gastos por mes"}
+          </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Enero — diciembre {year} · MXN · Solo gastos confirmados
+            Enero — diciembre {year} ·{" "}
+            {issued
+              ? currency + " · Ingresos emitidos con UUID"
+              : "MXN · Solo gastos confirmados"}
           </p>
         </div>
-        <form className="flex items-center gap-2">
-          <label className="text-xs text-zinc-400" htmlFor="year">
+        <form className="flex flex-wrap items-center gap-2">
+          <label
+            className="text-xs text-zinc-400"
+            htmlFor={issued ? "issued-year" : "year"}
+          >
             Año
           </label>
           <input
-            id="year"
+            id={issued ? "issued-year" : "year"}
             name="year"
             type="number"
             min={2000}
@@ -37,6 +49,20 @@ export function ChartPanels({
             defaultValue={year}
             className="input !w-24"
           />
+          {issued && (
+            <label className="text-xs">
+              Moneda
+              <select
+                name="currency"
+                className="input mt-1"
+                defaultValue={currency}
+              >
+                {["MXN", "USD", "EUR"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
             className="rounded-lg border border-white/10 px-3 py-2 text-xs"
             type="submit"
@@ -46,11 +72,17 @@ export function ChartPanels({
         </form>
       </div>
       <div className="mt-5">
-        <SpendChart data={data} />
+        <SpendChart
+          data={data}
+          issued={issued}
+          currency={issued ? currency : "MXN"}
+        />
       </div>
       {empty && (
         <p className="text-center text-sm text-zinc-500">
-          Aún no hay gastos confirmados en este año.
+          {issued
+            ? "Aún no hay ingresos emitidos en este año y moneda. Los borradores no se contabilizan."
+            : "Aún no hay gastos confirmados en este año."}
         </p>
       )}
       <details className="mt-4 text-xs text-zinc-500">
@@ -59,7 +91,14 @@ export function ChartPanels({
           {data.map((d) => (
             <div key={d.month}>
               <dt>{d.month}</dt>
-              <dd className="mt-1 font-mono text-zinc-300">{money(d.total)}</dd>
+              <dd className="mt-1 font-mono text-zinc-300">
+                {issued
+                  ? new Intl.NumberFormat("es-MX", {
+                      style: "currency",
+                      currency,
+                    }).format(d.total)
+                  : money(d.total)}
+              </dd>
             </div>
           ))}
         </dl>

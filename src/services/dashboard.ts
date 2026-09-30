@@ -1,7 +1,8 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
-export async function dashboardData(year: number) {
+import { Prisma } from "@/generated/prisma/client";
+export async function dashboardData(year: number, currency = "MXN") {
   const { organizationId } = await requireTenant();
   const db = getDb();
   const start = new Date(Date.UTC(year, 0, 1)),
@@ -73,9 +74,33 @@ export async function dashboardData(year: number) {
     month,
     total: Number(monthly.find((m) => m.month === i + 1)?.total ?? 0),
   }));
+  // issuedAt is stored in UTC; bucket by the organization's Mexican business calendar.
+  const [issued, currentIssued] = await Promise.all([
+    db.$queryRaw<
+      Array<{ month: number; total: PrismaDecimal; count: number }>
+    >`SELECT EXTRACT(MONTH FROM ("issuedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City'))::int AS month, SUM(total) AS total, COUNT(*)::int AS count FROM "StampedInvoice" WHERE "organizationId"=${organizationId} AND status='ISSUED' AND uuid IS NOT NULL AND "documentType"='I' AND currency=${currency} AND ("issuedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') >= ${start} AND ("issuedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') < ${end} GROUP BY 1`,
+    db.$queryRaw<
+      Array<{ total: PrismaDecimal | null }>
+    >`SELECT SUM(total) AS total FROM "StampedInvoice" WHERE "organizationId"=${organizationId} AND status='ISSUED' AND uuid IS NOT NULL AND "documentType"='I' AND currency=${currency} AND ("issuedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') >= ${new Date(Date.UTC(currentYear, month, 1))} AND ("issuedAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Mexico_City') < ${new Date(Date.UTC(currentYear, month + 1, 1))}`,
+  ]);
+  const issuedBars = months.map((month, i) => ({
+    month,
+    total: Number(issued.find((item) => item.month === i + 1)?.total ?? 0),
+  }));
+  const sum = (rows: { total: PrismaDecimal }[]) =>
+    Number(
+      rows.reduce(
+        (total, item) => total.add(item.total.toString()),
+        new Prisma.Decimal(0),
+      ),
+    );
   return {
+    issuedBars,
+    issuedYearTotal: sum(issued),
+    issuedMonthTotal: Number(currentIssued[0]?.total ?? 0),
+    issuedCount: issued.reduce((count, item) => count + item.count, 0),
     bars,
-    yearTotal: bars.reduce((sum, m) => sum + m.total, 0),
+    yearTotal: sum(monthly),
     monthTotal: Number(monthTotal._sum.total ?? 0),
     ticketCount,
     pending,
