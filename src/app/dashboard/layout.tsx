@@ -36,7 +36,7 @@ export default async function DashboardLayout({
       }
     >
       <Sidebar />
-      <div className="lg:pl-64">
+      <div className="orbit-workspace">
         <Topbar
           user={tenant.user}
           organizationId={tenant.organizationId}

@@ -784,19 +784,52 @@ try {
       await expect(
         dialog.getByRole("link", { name: "Reportes", exact: true }),
       ).toBeVisible();
-      const section = dialog
-        .locator("summary")
-        .filter({ hasText: "ADMINISTRACIÓN" });
-      await section.focus();
+      const invoices = dialog.getByRole("button", {
+        name: "Facturas",
+        exact: true,
+      });
+      await invoices.focus();
       await page.keyboard.press("Enter");
       await expect(
-        dialog.getByRole("link", { name: "Empresas", exact: true }),
-      ).not.toBeVisible();
-      await page.keyboard.press("Enter");
-      await expect(
-        dialog.getByRole("link", { name: "Empresas", exact: true }),
+        dialog.getByRole("link", {
+          name: "Administración de facturas",
+          exact: true,
+        }),
       ).toBeVisible();
+      await page.screenshot({
+        path: `test-results/sidebar-mobile-${width}.png`,
+      });
+      const menuAccessibility = await new AxeBuilder({ page })
+        .include(".orbit-mobile-navigation")
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze();
+      assert.deepEqual(
+        menuAccessibility.violations.map((v) => ({
+          id: v.id,
+          nodes: v.nodes.map((n) => n.target),
+        })),
+        [],
+      );
+      await page.keyboard.press("Enter");
+      await expect(
+        dialog.getByRole("link", {
+          name: "Administración de facturas",
+          exact: true,
+        }),
+      ).not.toBeVisible();
       await page.keyboard.press("Escape");
+      await expect(dialog).not.toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Abrir menú" }),
+      ).toBeFocused();
+      await page.getByRole("button", { name: "Abrir menú" }).click();
+      await dialog.click({ position: { x: 2, y: 200 } });
+      await expect(dialog).toBeVisible();
+      await page.mouse.click(width - 2, 450);
+      await expect(dialog).not.toBeVisible();
+      await page.getByRole("button", { name: "Abrir menú" }).click();
+      await dialog.getByRole("link", { name: "Reportes", exact: true }).click();
+      await expect(page).toHaveURL(/\/dashboard\/reports$/);
       await expect(dialog).not.toBeVisible();
     }
     await page.goto("/dashboard");
@@ -816,6 +849,166 @@ try {
   assert.deepEqual(errors, []);
   pass(
     "support search and all new private pages render at desktop/laptop/tablet/mobile widths; mobile dialog is keyboard accessible; no browser errors",
+  );
+  for (const width of [1440, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/dashboard");
+    const sidebar = page.getByRole("complementary", {
+      name: "Navegación de escritorio",
+    });
+    const dashboardLink = sidebar.getByRole("link", {
+      name: "Dashboard",
+      exact: true,
+    });
+    const reportsLink = sidebar.getByRole("link", {
+      name: "Reportes",
+      exact: true,
+    });
+    await expect(sidebar).toHaveAttribute("data-expanded", "false");
+    assert.equal(Math.round((await sidebar.boundingBox()).width), 68);
+    await expect(dashboardLink.locator("span")).not.toBeVisible();
+    await expect(
+      sidebar.getByRole("img", { name: "ORBIT NEXUS" }),
+    ).toBeVisible();
+    const beforeHover = await reportsLink.boundingBox();
+    await dashboardLink.hover();
+    await expect(page.getByRole("tooltip")).toHaveText("Dashboard");
+    await expect
+      .poll(() =>
+        dashboardLink
+          .locator("svg")
+          .evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).a),
+      )
+      .toBeGreaterThan(1.1);
+    assert.deepEqual(
+      await reportsLink.boundingBox(),
+      beforeHover,
+      "hover must not move adjacent links",
+    );
+    await expect(sidebar).toHaveAttribute("data-expanded", "false");
+    await page.screenshot({
+      path: `test-results/sidebar-collapsed-${width}.png`,
+    });
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).not.toBeVisible();
+    await reportsLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/dashboard\/reports$/);
+    await expect(sidebar).toHaveAttribute("data-expanded", "true");
+    await expect
+      .poll(async () => Math.round((await sidebar.boundingBox()).width))
+      .toBe(240);
+    await expect(reportsLink).toHaveAttribute("aria-current", "page");
+    const invoiceToggle = sidebar.getByRole("button", {
+      name: "Facturas",
+      exact: true,
+    });
+    await expect(invoiceToggle).toHaveAttribute("aria-expanded", "false");
+    await invoiceToggle.click();
+    await expect(invoiceToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      sidebar.getByRole("link", { name: "Administración de facturas" }),
+    ).toBeVisible();
+    await sidebar
+      .getByRole("link", { name: "CFDI emitidos", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/dashboard\/invoices\/issued$/);
+    await expect(invoiceToggle.locator("..")).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+    await expect(
+      sidebar.getByRole("link", { name: "CFDI emitidos", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      sidebar.getByRole("heading", { name: "FACTURACIÓN", exact: true }),
+    ).toBeVisible();
+    await expect(sidebar.getByText("FACTURACIÓN · FACTURAS")).toHaveCount(0);
+    await page.screenshot({
+      path: `test-results/sidebar-expanded-${width}.png`,
+    });
+    const expandedAxe = await new AxeBuilder({ page })
+      .include(".orbit-sidebar")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    assert.deepEqual(
+      expandedAxe.violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map((n) => n.target),
+      })),
+      [],
+    );
+    await sidebar.getByRole("button", { name: "Contraer menú" }).click();
+    await expect(sidebar).toHaveAttribute("data-expanded", "false");
+    await expect(invoiceToggle).toBeFocused();
+    await invoiceToggle.click();
+    await expect(sidebar).toHaveAttribute("data-expanded", "true");
+    await expect(invoiceToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page).toHaveURL(/\/dashboard\/invoices\/issued$/);
+    await sidebar.getByRole("link", { name: "Tickets", exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/tickets$/);
+    await expect(invoiceToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      sidebar.getByRole("link", { name: "CFDI recibidos", exact: true }),
+    ).toHaveAttribute("href", "/dashboard/invoices");
+    await expect(
+      sidebar.getByRole("link", { name: "Documentos fiscales", exact: true }),
+    ).toHaveAttribute("href", "/dashboard/fiscal-documents");
+    assert(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    );
+    const style = await sidebar.evaluate((e) => ({
+      blur: getComputedStyle(e).backdropFilter,
+      radius: getComputedStyle(e).borderRadius,
+    }));
+    assert.notEqual(style.blur, "none");
+    assert.notEqual(style.radius, "0px");
+    const box = await sidebar.boundingBox();
+    assert(box.x > 0 && box.y > 0 && box.y + box.height < 900);
+    const footer = await sidebar
+      .getByRole("button", { name: "Cerrar sesión" })
+      .boundingBox();
+    assert(footer.y + footer.height <= box.y + box.height);
+  }
+  for (const [accent, expectedColor] of [
+    ["PURPLE", "rgb(196, 181, 253)"],
+    ["BLUE", "rgb(147, 197, 253)"],
+    ["ORANGE", "rgb(253, 186, 116)"],
+    ["RED", "rgb(252, 165, 165)"],
+  ]) {
+    await json(await post(a.context, "/api/user/preferences", { accent }));
+    await page.goto("/dashboard");
+    const activeIcon = page.locator('.orbit-sidebar [aria-current="page"] svg');
+    await expect(activeIcon).toHaveCSS("color", expectedColor);
+    await page.locator('.orbit-sidebar [aria-current="page"]').click();
+    await expect(activeIcon).toHaveCSS("color", expectedColor);
+    const accentAxe = await new AxeBuilder({ page })
+      .include(".orbit-sidebar")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    assert.deepEqual(
+      accentAxe.violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map((n) => n.target),
+      })),
+      [],
+      accent,
+    );
+    await page.screenshot({
+      path: `test-results/sidebar-accent-${accent}.png`,
+    });
+  }
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(page.locator(".orbit-sidebar")).toHaveCSS(
+    "transition-duration",
+    "1e-05s",
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  assert.deepEqual(errors, []);
+  pass(
+    "floating sidebar defaults collapsed, tooltips/hover do not shift layout, click/keyboard expand, accordions preserve routes and active module, all four accents and reduced motion pass",
   );
   await json(
     await post(a.context, "/api/organizations", { name: "Segunda empresa UI" }),

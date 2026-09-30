@@ -2,14 +2,16 @@
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { LogOut } from "lucide-react";
-export function LogoutButton() {
+export function LogoutButton({ compact = false }: { compact?: boolean }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
     <div>
       <button
         disabled={busy}
-        className="flex items-center gap-3 rounded-xl p-3 text-sm text-zinc-400"
+        aria-label="Cerrar sesión"
+        data-tooltip="Cerrar sesión"
+        className="orbit-logout orbit-nav-item"
         onClick={async () => {
           setBusy(true);
           try {
@@ -24,11 +26,11 @@ export function LogoutButton() {
           }
         }}
       >
-        <LogOut className="size-4" />
-        Cerrar sesión
+        <LogOut className="orbit-nav-icon" aria-hidden="true" />
+        {!compact && <span>Cerrar sesión</span>}
       </button>
       {error && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="orbit-logout-error text-sm text-red-400">
           {error}
         </p>
       )}

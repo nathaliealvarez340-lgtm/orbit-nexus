@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { Menu, X } from "lucide-react";
 import { Navigation } from "./navigation";
 import { LogoutButton } from "./logout-button";
+import { Logo } from "@/components/brand/logo";
 export function MobileNavigation() {
   const dialog = useRef<HTMLDialogElement>(null);
   return (
@@ -10,6 +11,7 @@ export function MobileNavigation() {
       <button
         type="button"
         aria-label="Abrir menú"
+        aria-haspopup="dialog"
         className="rounded-lg p-3"
         onClick={() => dialog.current?.showModal()}
       >
@@ -18,13 +20,21 @@ export function MobileNavigation() {
       <dialog
         aria-label="Menú de navegación"
         ref={dialog}
-        className="m-0 h-dvh max-h-dvh w-80 max-w-[90vw] border-r border-white/10 bg-[#0c0c0f] p-4 text-white backdrop:bg-black/70"
+        className="orbit-mobile-navigation orbit-nav-panel"
         onClick={(e) => {
-          if (e.target === e.currentTarget) dialog.current?.close();
+          const rect = e.currentTarget.getBoundingClientRect();
+          if (
+            e.target === e.currentTarget &&
+            (e.clientX < rect.left ||
+              e.clientX > rect.right ||
+              e.clientY < rect.top ||
+              e.clientY > rect.bottom)
+          )
+            dialog.current?.close();
         }}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <p className="font-medium">ORBIT NEXUS</p>
+        <div className="orbit-mobile-header">
+          <Logo />
           <button
             className="p-3"
             type="button"
@@ -34,8 +44,10 @@ export function MobileNavigation() {
             <X className="size-5" />
           </button>
         </div>
-        <Navigation onNavigate={() => dialog.current?.close()} />
-        <div className="mt-5 border-t border-white/10 pt-3">
+        <div className="orbit-sidebar-scroll">
+          <Navigation onNavigate={() => dialog.current?.close()} />
+        </div>
+        <div className="orbit-sidebar-footer">
           <LogoutButton />
         </div>
       </dialog>
