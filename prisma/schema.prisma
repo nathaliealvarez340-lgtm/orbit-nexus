@@ -64,6 +64,7 @@ model Organization {
   notifications   Notification[]
   billingProviders OrganizationBillingProvider[]
   billingAttempts BillingAttempt[]
+  savedInvoiceConcepts SavedInvoiceConcept[]
 }
 
 model Membership {
@@ -440,8 +441,18 @@ model StampedInvoice {
   issuerRfc        String
   receiverRfc      String
   subtotal         Decimal                 @db.Decimal(12, 2)
+  // Transferred taxes (traslados).
   tax              Decimal                 @db.Decimal(12, 2)
   total            Decimal                 @db.Decimal(12, 2)
+  exchangeRate     Decimal?                @db.Decimal(14, 6)
+  exportCode       String                  @default("01")
+  discount         Decimal                 @default(0) @db.Decimal(12, 2)
+  withheldVat      Decimal                 @default(0) @db.Decimal(12, 2)
+  withheldIsr      Decimal                 @default(0) @db.Decimal(12, 2)
+  // Last server-side InvoiceValidationResult; READY requires canMarkReady.
+  validation       Json?
+  readyAt          DateTime?
+  idempotencyKey   String?
   concepts         StampedInvoiceConcept[]
   xmlUrl           String?
   pdfUrl           String?
@@ -450,20 +461,64 @@ model StampedInvoice {
 
   @@unique([organizationId, id])
   @@unique([organizationId, folio])
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, issuedAt])
+  @@index([organizationId, status, updatedAt])
 }
 
 model StampedInvoiceConcept {
-  id               String         @id @default(cuid())
-  stampedInvoiceId String
-  stampedInvoice   StampedInvoice @relation(fields: [stampedInvoiceId], references: [id], onDelete: Cascade)
-  description      String
-  productCode      String         @default("01010101")
-  unitCode         String         @default("ACT")
-  quantity         Decimal        @db.Decimal(12, 4)
-  unitPrice        Decimal        @db.Decimal(12, 2)
-  taxRate          Decimal        @db.Decimal(5, 4)
-  total            Decimal        @db.Decimal(12, 2)
+  id                 String         @id @default(cuid())
+  stampedInvoiceId   String
+  stampedInvoice     StampedInvoice @relation(fields: [stampedInvoiceId], references: [id], onDelete: Cascade)
+  position           Int            @default(0)
+  // Traceability only: the line is a snapshot, validated against the tenant on save.
+  savedConceptId     String?
+  description        String
+  productCode        String         @default("01010101")
+  unitCode           String         @default("ACT")
+  quantity           Decimal        @db.Decimal(12, 4)
+  unitPrice          Decimal        @db.Decimal(12, 2)
+  discount           Decimal        @default(0) @db.Decimal(12, 2)
+  taxObject          String         @default("02")
+  vatFactor          String         @default("TASA")
+  // Requested VAT rate as sent (null when absent); taxRate is the effective rate applied.
+  vatRate            Decimal?       @db.Decimal(7, 6)
+  taxRate            Decimal        @db.Decimal(5, 4)
+  withholdingVatRate Decimal?       @db.Decimal(7, 6)
+  withholdingIsrRate Decimal?       @db.Decimal(7, 6)
+  subtotal           Decimal        @default(0) @db.Decimal(12, 2)
+  transferredTaxes   Decimal        @default(0) @db.Decimal(12, 2)
+  withheldVat        Decimal        @default(0) @db.Decimal(12, 2)
+  withheldIsr        Decimal        @default(0) @db.Decimal(12, 2)
+  total              Decimal        @db.Decimal(12, 2)
+
+  @@index([stampedInvoiceId, position])
+}
+
+// Reusable concept template per Organization (contract §11). Never referenced by
+// foreign key from invoices, so editing or deactivating it cannot alter history.
+model SavedInvoiceConcept {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById        String
+  name               String
+  description        String
+  productCode        String
+  unitCode           String
+  defaultQuantity    Decimal?     @db.Decimal(12, 4)
+  unitPrice          Decimal?     @db.Decimal(12, 2)
+  taxObject          String       @default("02")
+  vatFactor          String       @default("TASA")
+  vatRate            Decimal?     @db.Decimal(7, 6)
+  withholdingVatRate Decimal?     @db.Decimal(7, 6)
+  withholdingIsrRate Decimal?     @db.Decimal(7, 6)
+  active             Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([organizationId, id])
+  @@index([organizationId, active, name])
 }
 
 enum SubscriptionPlan {
@@ -534,6 +589,9 @@ model InvoiceSettings {
   nextNumber     Int          @default(1)
   color          String       @default("#8b5cf6")
   template       String       @default("CLASSIC")
+  currencyDefault      String  @default("MXN")
+  paymentMethodDefault String?
+  paymentFormDefault   String?
   logoDocumentId String?
   logoDocument   Document?    @relation("InvoiceLogo", fields: [organizationId, logoDocumentId], references: [organizationId, id])
   updatedAt      DateTime     @updatedAt
