@@ -57,6 +57,7 @@ export async function monthlyReports() {
           invoiceCount,
           pendingCount: expenses.length - invoiceCount,
           rows: expenses.map((e) => ({
+            ticketId: e.ticketId,
             date: e.purchaseDate.toISOString().slice(0, 10),
             merchant: e.merchant,
             rfc: String(
@@ -103,7 +104,7 @@ export async function monthlyReports() {
       { timeout: 20000 },
     );
   }
-  return db.monthlyExpenseReport.findMany({
+  const reports = await db.monthlyExpenseReport.findMany({
     where: { organizationId },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     select: {
@@ -115,8 +116,54 @@ export async function monthlyReports() {
       invoiceCount: true,
       pendingCount: true,
       createdAt: true,
+      snapshot: true,
     },
   });
+  const invoices = await db.invoice.findMany({
+    where: {
+      organizationId,
+      status: "ISSUED",
+      ticketId: {
+        in: reports.flatMap((r) =>
+          (r.snapshot as unknown as ReportSnapshot).rows.flatMap((row) =>
+            row.ticketId ? [row.ticketId] : [],
+          ),
+        ),
+      },
+    },
+    select: { ticketId: true, uuid: true },
+  });
+  return reports.map(({ snapshot: raw, ...report }) => {
+    const snapshot = enrichInvoiceEvidence(
+      raw as unknown as ReportSnapshot,
+      invoices,
+    );
+    return {
+      ...report,
+      invoiceCount: snapshot.invoiceCount,
+      pendingCount: snapshot.pendingCount,
+    };
+  });
+}
+function enrichInvoiceEvidence(
+  original: ReportSnapshot,
+  invoices: { ticketId: string | null; uuid: string | null }[],
+) {
+  const rows = original.rows.map((row) => {
+    const invoice = row.ticketId
+      ? invoices.find((i) => i.ticketId === row.ticketId)
+      : undefined;
+    return invoice
+      ? { ...row, uuid: invoice.uuid ?? "", status: "INVOICED" }
+      : row;
+  });
+  const invoiceCount = rows.filter((r) => r.status === "INVOICED").length;
+  return {
+    ...original,
+    rows,
+    invoiceCount,
+    pendingCount: original.ticketCount - invoiceCount,
+  };
 }
 export async function reportSnapshot(id: string) {
   const { organizationId } = await requireTenant();
@@ -124,5 +171,18 @@ export async function reportSnapshot(id: string) {
     where: { organizationId, id },
   });
   if (!report) throw new ApiError(404, "Reporte no disponible.");
-  return { ...report, snapshot: report.snapshot as unknown as ReportSnapshot };
+  const original = report.snapshot as unknown as ReportSnapshot;
+  // Financial closure stays immutable. Only attach later CFDI evidence by an exact tenant/ticket link.
+  const invoices = await getDb().invoice.findMany({
+    where: {
+      organizationId,
+      status: "ISSUED",
+      ticketId: {
+        in: original.rows.flatMap((r) => (r.ticketId ? [r.ticketId] : [])),
+      },
+    },
+    select: { ticketId: true, uuid: true },
+  });
+  const snapshot = enrichInvoiceEvidence(original, invoices);
+  return { ...report, snapshot };
 }

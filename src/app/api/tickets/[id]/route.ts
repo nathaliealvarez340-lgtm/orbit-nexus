@@ -14,6 +14,8 @@ export async function GET(
             provider: extractedData.provider,
             confidence: extractedData.confidence,
             fields: extractedData.fields,
+            warnings: extractedData.warnings,
+            fieldConfidence: extractedData.fieldConfidence,
           }
         : null,
     });

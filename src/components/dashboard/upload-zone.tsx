@@ -153,7 +153,9 @@ export function UploadZone({ fiscal = false }: { fiscal?: boolean }) {
       }
       setStep("Analizando ticket…");
       // A failed provider still leaves the captured ticket available for manual review.
-      await fetch("/api/tickets/" + data.id + "/analyze", { method: "POST" });
+      await fetch("/api/tickets/" + data.id + "/analyze", {
+        method: "POST",
+      }).catch(() => undefined);
       // Discard prefetched ticket lists and metrics after a persisted upload.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign("/dashboard/tickets/" + data.id);
@@ -167,10 +169,17 @@ export function UploadZone({ fiscal = false }: { fiscal?: boolean }) {
   return (
     <div className="space-y-5">
       {!fiscal && (
-        <p className="text-sm leading-6 text-zinc-400">
-          Asegúrate de que el ticket esté completo, bien iluminado y que toda la
-          información sea legible.
-        </p>
+        <div className="text-sm leading-6 text-zinc-400">
+          <p>
+            Asegúrate de que el ticket esté completo, bien iluminado y que toda
+            la información sea legible.
+          </p>
+          <ul className="mt-2 list-inside list-disc text-xs">
+            <li>Evita reflejos y no cortes bordes.</li>
+            <li>Procura que el texto esté enfocado.</li>
+            <li>Incluye QR, URL y datos para facturación.</li>
+          </ul>
+        </div>
       )}
       <div className="flex flex-wrap gap-3">
         {!fiscal && (

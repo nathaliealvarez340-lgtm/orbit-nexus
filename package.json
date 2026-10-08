@@ -19,7 +19,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "postinstall": "prisma generate",
-    "test:phase3:e2e": "node scripts/phase3-e2e.mjs"
+    "test:phase3:e2e": "node scripts/phase3-e2e.mjs",
+    "test:phase4:e2e": "node scripts/ticket-intelligence-e2e.mjs && node --conditions=react-server --import tsx scripts/billing-e2e.mjs"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.5",
@@ -31,8 +32,9 @@
     "fast-xml-parser": "^5.11.1",
     "framer-motion": "^12.40.0",
     "gsap": "^3.15.0",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.17.0",
-    "next": "16.3.5",
+    "next": "16.3.6",
     "pdf-lib": "^1.17.1",
     "pg": "^8.23.0",
     "react": "19.2.4",
@@ -62,12 +64,14 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.5",
+    "eslint-config-next": "16.3.6",
     "prettier": "^3.9.8",
     "prisma": "7.10.0",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

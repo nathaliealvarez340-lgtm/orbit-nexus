@@ -12,6 +12,8 @@ export const ticketStatuses: Record<string, string> = {
   REGISTERED: "Registrado",
   INVOICED: "Facturado",
   ERROR: "Requiere revisión",
+  OCR_FAILED: "No se pudo leer",
+  NEEDS_MANUAL_INPUT: "Completar manualmente",
 };
 export const billingStatuses: Record<string, string> = {
   NOT_REQUESTED: "Sin solicitar",
@@ -19,6 +21,9 @@ export const billingStatuses: Record<string, string> = {
   REQUIRES_DATA: "Faltan datos",
   REDIRECT_REQUIRED: "Continuar en portal",
   PROCESSING: "En proceso",
+  BILLING_REVIEW: "Factura preparada: revisar",
+  SUBMITTED: "Enviado: esperando CFDI",
+  NEEDS_MANUAL_ACTION: "Requiere intervención",
   INVOICED: "Facturado",
   FAILED: "Falló",
 };
@@ -33,6 +38,8 @@ export const activityLabels: Record<string, string> = {
   LOGIN: "Inicio de sesión",
   TICKET_UPLOADED: "Ticket capturado",
   TICKET_ANALYZED: "Ticket preparado para revisión",
+  TICKET_OCR_FAILED: "Lectura de ticket pendiente",
+  TICKET_CONFIRMED: "Datos de ticket confirmados",
   EXPENSE_CONFIRMED: "Gasto confirmado",
   INVOICE_STARTED: "Facturación preparada",
   BILLING_DETAILS_UPDATED: "Referencias de facturación actualizadas",

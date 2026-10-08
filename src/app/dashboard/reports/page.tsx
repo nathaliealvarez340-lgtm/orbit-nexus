@@ -10,12 +10,14 @@ export default async function Page() {
       <PageHeader
         eyebrow="Gastos"
         title="Reportes mensuales"
-        copy="Historial de meses cerrados. Cada reporte conserva los datos del momento de su generación."
+        copy="Historial de meses cerrados. Los importes y tickets del cierre se conservan."
       />
       <p className="text-sm text-zinc-400">
         PDF y Excel incluyen resumen y detalle de gastos confirmados en MXN. Un
         gasto registrado después de generar el cierre no altera el reporte
-        histórico.
+        histórico. Los cierres nuevos muestran también los CFDI vinculados
+        posteriormente a sus tickets. Los cierres antiguos sin vínculos conservan
+        la información original.
       </p>
       <div
         className="surface overflow-x-auto"

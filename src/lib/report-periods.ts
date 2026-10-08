@@ -31,6 +31,7 @@ export type ReportSnapshot = {
   invoiceCount: number;
   pendingCount: number;
   rows: {
+    ticketId?: string;
     date: string;
     merchant: string;
     rfc: string;

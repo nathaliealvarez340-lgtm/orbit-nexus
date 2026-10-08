@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cfdiUses } from "./fiscal-catalogs";
+import { normalizeBillingUrl } from "./billing-url";
 
 export const passwordSchema = z
   .string()
@@ -21,11 +22,7 @@ export const registerSchema = z
   });
 const money = z
   .string()
-  .regex(/^\d{1,10}(\.\d{1,2})?$/, "Importe válido con hasta dos decimales")
-  .refine(
-    (v) => Number(v) > 0 && Number(v) < 10000000000,
-    "Importe fuera de rango",
-  );
+  .regex(/^\d{1,10}(\.\d{1,2})?$/, "Importe válido con hasta dos decimales");
 const optionalText = z.string().trim().max(250).optional();
 export const dateSchema = z
   .string()
@@ -46,7 +43,24 @@ export const expenseSchema = z.object({
   branch: optionalText,
   paymentMethod: optionalText,
   billingReference: optionalText,
-  billingUrl: z.union([z.literal(""), z.url().max(1000)]).optional(),
+  billingUrl: z
+    .string()
+    .trim()
+    .max(1000)
+    .refine(
+      (v) => !v || normalizeBillingUrl(v) !== null,
+      "Usa una URL web pública válida, sin credenciales",
+    )
+    .transform((v) => (v ? normalizeBillingUrl(v)! : ""))
+    .optional(),
+  terminalNumber: optionalText,
+  paymentReference: optionalText,
+  currency: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{3}$/, "Confirma la moneda con tres letras")
+    .default("MXN"),
   subtotal: z.union([z.literal(""), money]).optional(),
   tax: z
     .union([z.literal(""), z.string().regex(/^\d{1,10}(\.\d{1,2})?$/)])

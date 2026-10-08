@@ -48,7 +48,7 @@ test("uploads validate extension, MIME, signature, size and safe names", async (
     ),
   );
 });
-test("confirmation requires actual date and positive exact money", () => {
+test("confirmation requires actual date and nonnegative exact money", () => {
   assert(
     expenseSchema.safeParse({
       merchant: "OXXO",
@@ -56,7 +56,7 @@ test("confirmation requires actual date and positive exact money", () => {
       total: "120.50",
     }).success,
   );
-  for (const total of ["0", "-1", "10.001", "1e5", "NaN"])
+  for (const total of ["-1", "10.001", "1e5", "NaN"])
     assert(
       !expenseSchema.safeParse({
         merchant: "OXXO",

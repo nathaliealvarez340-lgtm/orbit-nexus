@@ -5,11 +5,13 @@ import { ApiError, enforceRateLimit } from "@/lib/http";
 import { validateUpload, UploadValidationError } from "@/lib/upload-validation";
 import { parseCfdi } from "@/lib/cfdi";
 import { Prisma } from "@/generated/prisma/client";
+import type { BillingContext } from "./billing/types";
 export async function importInvoice(
   ticketId: string,
   xml: File,
   pdf: File | null,
   confirmed: boolean,
+  evidence?: { attemptId: string; uuid?: string },
 ) {
   const { organizationId, userId } = await requireTenant();
   await enforceRateLimit("invoice-import:" + userId, 15, 3600);
@@ -34,20 +36,63 @@ export async function importInvoice(
     );
   }
   return getDb().$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id=${ticketId} AND "organizationId"=${organizationId} FOR UPDATE`;
     const ticket = await tx.ticket.findFirst({
       where: { id: ticketId, organizationId },
       include: { expense: true },
     });
     if (!ticket) throw new ApiError(404, "Ticket no disponible.");
     if (!ticket.expense) throw new ApiError(409, "Confirma el gasto primero.");
+    const attempt = await tx.billingAttempt.findFirst({
+      where: {
+        organizationId,
+        ticketId,
+        ...(evidence
+          ? { id: evidence.attemptId }
+          : {
+              OR: [{ activeKey: ticketId }, { status: "NEEDS_MANUAL_ACTION" }],
+            }),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (evidence && (!attempt || !attempt.submittedAt))
+      throw new ApiError(409, "No existe un envío aprobado para este CFDI.");
+    if (!evidence && attempt?.status === "SUBMITTING")
+      throw new ApiError(
+        409,
+        "El envío al portal sigue en curso. Consulta su resultado antes de incorporar otro XML.",
+      );
+    const existing = await tx.invoice.findFirst({
+      where: { organizationId, ticketId },
+    });
+    if (
+      evidence &&
+      existing?.billingAttemptId === evidence.attemptId &&
+      existing.uuid === data.uuid
+    )
+      return { id: existing.id };
+    const context = attempt?.context as unknown as BillingContext | undefined;
     const fiscal = await tx.fiscalProfile.findFirst({
       where: { organizationId },
     });
-    if (!fiscal || fiscal.rfc !== data.receiverRfc)
+    const expectedRfc = evidence
+      ? context?.fields.find((f) => f.key === "rfc")?.value
+      : fiscal?.rfc;
+    if (!expectedRfc || expectedRfc !== data.receiverRfc)
       throw new ApiError(
         400,
         "El RFC receptor no coincide con el perfil fiscal de la organización.",
       );
+    const expectedIssuer =
+      (evidence ? context?.expectedIssuerRfc : null) ||
+      (ticket.expense.details as Record<string, unknown> | null)?.issuerRfc;
+    if (expectedIssuer && expectedIssuer !== data.issuerRfc)
+      throw new ApiError(
+        400,
+        "El RFC emisor no coincide con el comercio confirmado.",
+      );
+    if (evidence?.uuid && evidence.uuid.toLowerCase() !== data.uuid)
+      throw new ApiError(400, "El UUID anunciado no coincide con el XML.");
     if (!ticket.expense.total.equals(new Prisma.Decimal(data.total)))
       throw new ApiError(
         400,
@@ -59,7 +104,7 @@ export async function importInvoice(
         organizationId,
         billingStatus: { not: "INVOICED" },
       },
-      data: { billingStatus: "INVOICED" },
+      data: { billingStatus: "INVOICED", status: "INVOICED" },
     });
     if (!claim.count)
       throw new ApiError(409, "El ticket ya tiene una factura incorporada.");
@@ -90,6 +135,7 @@ export async function importInvoice(
         organizationId,
         userId,
         ticketId,
+        billingAttemptId: attempt?.id,
         uuid: data.uuid,
         issuerName: data.issuerName,
         receiverRfc: data.receiverRfc,
@@ -108,6 +154,27 @@ export async function importInvoice(
       where: { organizationId, ticketId },
       data: { billingStatus: "INVOICED" },
     });
+    if (attempt) {
+      await tx.billingAttempt.updateMany({
+        where: { id: attempt.id, organizationId },
+        data: {
+          status: "SUCCEEDED",
+          activeKey: null,
+          errorCode: null,
+          errorCategory: null,
+          approvalHash: null,
+          approvalExpiresAt: null,
+          completedAt: new Date(),
+        },
+      });
+      await tx.billingAttemptEvent.createMany({
+        data: ["CFDI_VALIDATED", "COMPLETED"].map((type) => ({
+          organizationId,
+          attemptId: attempt.id,
+          type,
+        })),
+      });
+    }
     await tx.activityLog.create({
       data: {
         organizationId,
@@ -115,7 +182,10 @@ export async function importInvoice(
         action: "INVOICE_COMPLETED",
         entityType: "Invoice",
         entityId: invoice.id,
-        metadata: { source: "USER_UPLOAD", satVerification: "PENDING" },
+        metadata: {
+          source: evidence ? "PORTAL_XML" : "USER_UPLOAD",
+          satVerification: "PENDING",
+        },
       },
     });
     return { id: invoice.id };

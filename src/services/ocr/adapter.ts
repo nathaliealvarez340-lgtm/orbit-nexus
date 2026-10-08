@@ -1,5 +1,8 @@
 import "server-only";
 import { z } from "zod";
+import { extractionKeys, type TicketOcrProvider } from "./types";
+import { normalizeExtraction } from "./normalize";
+import { readTicketQr } from "./qr";
 const fieldsSchema = z.object({
   merchant: z.string().max(150).optional(),
   issuerRfc: z.string().max(20).optional(),
@@ -19,7 +22,22 @@ const fieldsSchema = z.object({
 const resultSchema = z.object({
   provider: z.string().max(80),
   confidence: z.number().min(0).max(1).nullable().optional(),
-  fields: fieldsSchema,
+  fields: fieldsSchema
+    .extend(
+      Object.fromEntries(
+        [...Object.keys(fieldsSchema.shape), ...extractionKeys].map((key) => [
+          key,
+          z
+            .string()
+            .max(key === "qrPayload" ? 4096 : key === "billingUrl" ? 1000 : 250)
+            .nullable()
+            .optional(),
+        ]),
+      ),
+    )
+    .extend({ timezone: z.string().max(80).nullable().optional() }),
+  rawText: z.string().max(100000).nullable().optional(),
+  fieldConfidence: z.record(z.string(), z.number().min(0).max(1)).optional(),
   raw: z.unknown().optional(),
 });
 export interface TicketOcrAdapter {
@@ -27,6 +45,26 @@ export interface TicketOcrAdapter {
     content: Uint8Array;
     mimeType: string;
   }): Promise<z.infer<typeof resultSchema>>;
+}
+
+/** Server-only domain boundary; QR decoding also works without an OCR subscription. */
+export function getTicketOcrProvider(): TicketOcrProvider {
+  return {
+    async analyzeTicket(document) {
+      const qr = await readTicketQr(document);
+      try {
+        const result = await getTicketOcrAdapter().analyze(document);
+        return normalizeExtraction(result, qr);
+      } catch {
+        // Do not expose provider errors, endpoints, headers or response bodies.
+        return normalizeExtraction(
+          { provider: "http-ocr", fields: {} },
+          qr,
+          true,
+        );
+      }
+    },
+  };
 }
 export function getTicketOcrAdapter(): TicketOcrAdapter {
   if (!process.env.OCR_API_URL)
@@ -72,9 +110,11 @@ export function getTicketOcrAdapter(): TicketOcrAdapter {
         }
         chunks.push(value);
       }
-      return resultSchema.parse(
-        JSON.parse(Buffer.concat(chunks).toString("utf8")),
+      const payload: unknown = JSON.parse(
+        Buffer.concat(chunks).toString("utf8"),
       );
+      const result = resultSchema.parse(payload);
+      return { ...result, raw: result.raw ?? payload };
     },
   };
 }

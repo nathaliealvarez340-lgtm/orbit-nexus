@@ -8,7 +8,9 @@ import { ApiError } from "@/lib/http";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TicketReview } from "@/components/forms/ticket-review";
 import { AssistedInvoice } from "@/components/forms/assisted-invoice";
+import { TicketBilling } from "@/components/forms/ticket-billing";
 import { money, ticketStatuses, billingStatuses } from "@/lib/display";
+import { reviewFields } from "@/lib/ticket-extraction";
 export default async function Page({
   params,
 }: {
@@ -19,11 +21,8 @@ export default async function Page({
     if (e instanceof ApiError && e.status === 404) notFound();
     throw e;
   });
-  const fields = Object.fromEntries(
-    Object.entries(ticket.extractedData?.fields || {}).filter(
-      ([, v]) => typeof v === "string",
-    ),
-  ) as Record<string, string>;
+  const fields = reviewFields(ticket.extractedData?.fields);
+  const confirmed = reviewFields(ticket.confirmedData);
   return (
     <div className="space-y-7">
       <PageHeader
@@ -96,20 +95,50 @@ export default async function Page({
                 Ver dashboard actualizado →
               </Link>
             </section>
+            <TicketBilling ticketId={ticket.id} />
             {ticket.billingStatus !== "INVOICED" && (
               <>
-                <AssistedInvoice ticketId={ticket.id} />
+                <details className="surface p-4">
+                  <summary className="cursor-pointer text-sm text-zinc-300">
+                    Referencias y ayuda para facturación manual
+                  </summary>
+                  <div className="mt-4">
+                    <AssistedInvoice ticketId={ticket.id} />
+                  </div>
+                </details>
                 <InvoiceImport ticketId={ticket.id} />
               </>
             )}
           </div>
+        ) : ticket.confirmedAt ? (
+          <section className="surface p-6 space-y-3">
+            <h2 className="text-xl font-semibold">Datos confirmados</h2>
+            <p>
+              {confirmed.merchant} · {confirmed.purchaseDate}
+            </p>
+            <p className="font-mono text-2xl">
+              {confirmed.total} {confirmed.currency}
+            </p>
+            <p className="text-sm text-zinc-400">
+              Ticket conservado en su moneda original. No se ha sumado a gastos
+              MXN ni se ha emitido una factura.
+            </p>
+          </section>
         ) : (
           <TicketReview
+            key={ticket.updatedAt.toISOString()}
             id={ticket.id}
             status={ticket.status}
             provider={ticket.extractedData?.provider}
             confidence={ticket.extractedData?.confidence}
             fields={fields}
+            warnings={
+              Array.isArray(ticket.extractedData?.warnings)
+                ? ticket.extractedData.warnings.filter(
+                    (v): v is string => typeof v === "string",
+                  )
+                : []
+            }
           />
         )}
       </div>

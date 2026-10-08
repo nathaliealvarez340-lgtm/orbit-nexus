@@ -20,6 +20,8 @@ enum TicketStatus {
   ERROR
   REVIEW
   REGISTERED
+  OCR_FAILED
+  NEEDS_MANUAL_INPUT
 }
 
 enum MembershipRole {
@@ -36,6 +38,9 @@ enum BillingStatus {
   PROCESSING
   INVOICED
   FAILED
+  BILLING_REVIEW
+  SUBMITTED
+  NEEDS_MANUAL_ACTION
 }
 
 model Organization {
@@ -57,6 +62,8 @@ model Organization {
   invoiceSettings InvoiceSettings?
   reports         MonthlyExpenseReport[]
   notifications   Notification[]
+  billingProviders OrganizationBillingProvider[]
+  billingAttempts BillingAttempt[]
 }
 
 model Membership {
@@ -285,6 +292,14 @@ model Ticket {
   total          Decimal?             @db.Decimal(12, 2)
   purchaseDate   DateTime?
   extractedData  TicketExtractedData?
+  ocrAttempts    TicketOcrAttempt[]
+  billingAttempts BillingAttempt[]
+  analysisToken  String?
+  analysisStartedAt DateTime?
+  confirmedData  Json?
+  confirmedAt    DateTime?
+  billingUrl     String?
+  qrPayload      String?
   invoice        Invoice?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
@@ -304,9 +319,30 @@ model TicketExtractedData {
   confidence     Float?
   fields         Json
   rawResult      Json?
+  rawText        String?
+  warnings       Json?
+  fieldConfidence Json?
   createdAt      DateTime @default(now())
 
   @@unique([organizationId, ticketId])
+}
+
+model TicketOcrAttempt {
+  id             String   @id
+  organizationId String
+  ticketId       String
+  ticket         Ticket   @relation(fields: [organizationId, ticketId], references: [organizationId, id], onDelete: Cascade)
+  provider       String?
+  outcome        String   @default("ANALYZING")
+  rawText        String?
+  rawPayload     Json?
+  detectedData   Json?
+  confidence     Float?
+  warnings       Json?
+  startedAt      DateTime @default(now())
+  finishedAt     DateTime?
+
+  @@index([organizationId, ticketId, startedAt])
 }
 
 model Invoice {
@@ -318,6 +354,8 @@ model Invoice {
   issuedAt       DateTime?
   xmlDocumentId  String?
   pdfDocumentId  String?
+  billingAttemptId String? @unique
+  billingAttempt BillingAttempt? @relation(fields: [organizationId, billingAttemptId], references: [organizationId, id])
   xmlDocument    Document?        @relation("InvoiceXml", fields: [organizationId, xmlDocumentId], references: [organizationId, id])
   pdfDocument    Document?        @relation("InvoicePdf", fields: [organizationId, pdfDocumentId], references: [organizationId, id])
   userId         String
@@ -339,6 +377,7 @@ model Invoice {
 
   @@unique([organizationId, ticketId])
   @@unique([organizationId, uuid])
+  @@unique([organizationId, billingAttemptId])
   @@index([organizationId, createdAt])
 }
 
@@ -360,6 +399,13 @@ model Company {
   compatibility  CompatibilityLevel
   requiredFields Json
   rules          Json
+  merchantRfc    String?
+  domain         String?
+  active         Boolean @default(true)
+  automationMode String @default("ASSISTED")
+  adapterKey     String @default("manual")
+  notes          String?
+  organizations OrganizationBillingProvider[]
   tickets        Ticket[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
@@ -554,4 +600,84 @@ model ActivityLog {
   @@index([userId, createdAt])
   @@index([entityType, entityId])
   @@index([organizationId, createdAt])
+}
+
+model OrganizationBillingProvider {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String?
+  company        Company? @relation(fields: [companyId], references: [id])
+  name           String
+  merchantRfc    String?
+  domain         String
+  customBillingUrl String
+  favorite       Boolean @default(false)
+  lastUsedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  attempts       BillingAttempt[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, domain])
+}
+
+enum BillingAttemptStatus {
+  PREPARING
+  AWAITING_APPROVAL
+  SUBMITTING
+  WAITING_PROVIDER
+  SUCCEEDED
+  FAILED
+  NEEDS_MANUAL_ACTION
+  CANCELLED
+}
+
+model BillingAttempt {
+  id             String @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ticketId       String
+  ticket         Ticket @relation(fields: [organizationId, ticketId], references: [organizationId, id])
+  providerId     String
+  provider       OrganizationBillingProvider @relation(fields: [organizationId, providerId], references: [organizationId, id])
+  requestedById  String
+  status         BillingAttemptStatus @default(PREPARING)
+  activeKey      String? @unique
+  idempotencyKey String @unique
+  adapterKey     String
+  billingUrl     String
+  context        Json
+  contextHash    String
+  missingFields  Json?
+  errorCode      String?
+  errorCategory  String?
+  remoteSession  String?
+  approvalHash   String?
+  approvalExpiresAt DateTime?
+  approvedBy     String?
+  approvedAt     DateTime?
+  submittedAt    DateTime?
+  retryCount     Int @default(0)
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  events         BillingAttemptEvent[]
+  invoice        Invoice?
+
+  @@unique([organizationId, id])
+  @@index([organizationId, ticketId, createdAt])
+}
+
+model BillingAttemptEvent {
+  id             String @id @default(cuid())
+  organizationId String
+  attemptId      String
+  attempt        BillingAttempt @relation(fields: [organizationId, attemptId], references: [organizationId, id], onDelete: Cascade)
+  type           String
+  errorCode      String?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, attemptId, createdAt])
 }

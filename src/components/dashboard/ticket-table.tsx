@@ -7,6 +7,8 @@ type Row = {
   status: string;
   billingStatus: string;
   createdAt: Date;
+  confirmedAt?: Date | null;
+  purchaseDate?: Date | null;
   user: { name: string };
   expense: {
     merchant: string;
@@ -66,6 +68,7 @@ export function TicketTable({
               </td>
               <td className="whitespace-nowrap px-5 py-4 text-zinc-400">
                 {t.expense?.purchaseDate.toISOString().slice(0, 10) ||
+                  (t.confirmedAt && t.purchaseDate?.toISOString().slice(0, 10)) ||
                   "Por confirmar"}
               </td>
               <td className="whitespace-nowrap px-5 py-4 font-mono">

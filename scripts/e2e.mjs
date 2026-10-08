@@ -179,7 +179,7 @@ try {
   });
   const ticketId = page.url().split("/").pop();
   await expect(
-    page.getByText("El OCR aún no está conectado.", { exact: false }),
+    page.getByText("El OCR aún no está conectado. Completa la información del ticket; los valores no se inventan.", { exact: true }),
   ).toBeVisible();
   assert.equal(
     (await query('SELECT COUNT(*)::int AS count FROM "Expense"'))[0].count,
@@ -192,7 +192,7 @@ try {
   await page.getByText("Información adicional", { exact: true }).click();
   await page.getByLabel("Número de operación / ID / TR").fill("ID456");
   await page
-    .getByRole("button", { name: "Confirmar y registrar", exact: true })
+    .getByRole("button", { name: "Confirmar datos", exact: true })
     .click();
   await expect(
     page.getByText("Confirmado y registrado", { exact: true }),
@@ -447,6 +447,9 @@ try {
   assert.equal(missingReference.status, "REQUIRES_DATA");
   assert(missingReference.missing.includes("ID de venta"));
   await page.goto("/dashboard/tickets/" + ticketId);
+  await page
+    .getByText("Referencias y ayuda para facturación manual", { exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Facturar ticket", exact: true })
     .click();
