@@ -1,5 +1,6 @@
 // Fase 5 shared contract (docs/tasks/FASE5-CONTRACT.md). Not server-only: types only.
 // Decimal values travel as strings and are converted/validated server-side with Decimal.
+import type { PacEnvironment } from "./stamping";
 
 export type InvoiceDocumentType = "I" | "E" | "T";
 export type InvoicePaymentMethod = "PUE" | "PPD";
@@ -259,6 +260,15 @@ export type InvoicePartySnapshot = {
   state?: string;
 };
 
+/**
+ * Fase 5C: why fiscal edits are blocked. STAMP_IN_PROGRESS covers an active attempt,
+ * RECONCILIATION_REQUIRED an UNKNOWN attempt, ISSUED a stamped (immutable) invoice.
+ */
+export type InvoiceEditLock = {
+  locked: boolean;
+  reason: "STAMP_IN_PROGRESS" | "RECONCILIATION_REQUIRED" | "ISSUED" | null;
+};
+
 /** §26: GET /api/outgoing-invoices/[id] */
 export type InvoiceDraftDetail = {
   id: string;
@@ -287,4 +297,18 @@ export type InvoiceDraftDetail = {
   subtotal: string;
   tax: string;
   total: string;
+
+  // Fase 5C (docs/tasks/FASE5C-CONTRACT.md). Optional until the backend populates
+  // them (Fase 5C-A); consumers must treat an absent field as "not provided yet".
+  /** Draft version; a stamping attempt is bound to the exact version it signed. */
+  version?: number;
+  /** CFDI emission date-time (Comprobante Fecha). */
+  issuedAt?: string | null;
+  /** FechaTimbrado from the Timbre Fiscal Digital; never used as issuedAt. */
+  stampedAt?: string | null;
+  fiscalEnvironment?: PacEnvironment | null;
+  /** Private downloads through the existing GET /api/documents/[id]. */
+  xmlDocumentId?: string | null;
+  pdfDocumentId?: string | null;
+  editLock?: InvoiceEditLock;
 };
