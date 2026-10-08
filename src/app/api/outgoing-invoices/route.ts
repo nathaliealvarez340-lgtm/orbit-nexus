@@ -1,4 +1,5 @@
 import { apiError, assertSameOrigin, readJson } from "@/lib/http";
+import { invoiceApiError, invoiceStudioBodyLimit } from "@/lib/invoice-api";
 import {
   createInvoiceDraft,
   issuedInvoices,
@@ -13,10 +14,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
-    return Response.json(await createInvoiceDraft(await readJson(request)), {
-      status: 201,
-    });
+    const { created, result } = await createInvoiceDraft(
+      await readJson(request, invoiceStudioBodyLimit),
+      request.headers.get("idempotency-key"),
+    );
+    // 200 means an Idempotency-Key replay returned the draft created earlier.
+    return Response.json(result, { status: created ? 201 : 200 });
   } catch (e) {
-    return apiError(e);
+    return invoiceApiError(e);
   }
 }

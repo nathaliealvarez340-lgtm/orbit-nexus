@@ -53,10 +53,11 @@ export async function readBody(request: Request, maxBytes: number) {
   }
   return Buffer.concat(chunks);
 }
-export async function readJson(request: Request) {
+// 32 KiB by default; only routes with a dedicated contract limit pass a larger value.
+export async function readJson(request: Request, maxBytes = 32768) {
   try {
     return JSON.parse(
-      Buffer.from(await readBody(request, 32768)).toString("utf8"),
+      Buffer.from(await readBody(request, maxBytes)).toString("utf8"),
     );
   } catch (e) {
     if (e instanceof ApiError) throw e;
