@@ -7,6 +7,8 @@ import type {
   CreateInvoiceDraftResponse,
   InvoiceStudioContext,
   InvoiceValidationIssue,
+  InvoiceDraftDetail,
+  ValidateInvoiceDraftResponse,
 } from "@/types/invoice-studio";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +23,6 @@ import {
   draftRequest,
   issueTarget,
   newDraft,
-  type DraftDetail,
-  type Evaluation,
 } from "@/components/invoice-studio/model";
 import {
   readContext,
@@ -43,11 +43,12 @@ export function OutgoingInvoiceForm({
 }) {
   const [context, setContext] = useState<InvoiceStudioContext>();
   const [draft, setDraft] = useState<CreateInvoiceDraftRequest>();
-  const [snapshot, setSnapshot] = useState<DraftDetail>();
-  const [saved, setSaved] = useState<CreateInvoiceDraftResponse>();
+  const [snapshot, setSnapshot] = useState<InvoiceDraftDetail>();
+  const [saved, setSaved] = useState<
+    CreateInvoiceDraftResponse | InvoiceDraftDetail
+  >();
   const [keys, setKeys] = useState<string[]>([]);
-  const [evaluation, setEvaluation] = useState<Evaluation>();
-  const [issues, setIssues] = useState<InvoiceValidationIssue[]>([]);
+  const [evaluation, setEvaluation] = useState<ValidateInvoiceDraftResponse>();
   const [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState<"save" | "ready" | null>(null);
   const [validating, setValidating] = useState(false),
@@ -89,7 +90,6 @@ export function OutgoingInvoiceForm({
         setDirty(false);
         setConflict(false);
         setUncertain(false);
-        setIssues([]);
         setMessage("");
         if (initialView) setView(initialView);
       })
@@ -129,12 +129,12 @@ export function OutgoingInvoiceForm({
       );
       if (!controller.signal.aborted && version === revision.current) {
         setEvaluation(result);
-        setIssues([]);
       }
     } catch (error) {
       if (!controller.signal.aborted && version === revision.current) {
         setValidationError((error as Error).message);
-        if (error instanceof StudioRequestError) setIssues(error.issues ?? []);
+        if (error instanceof StudioRequestError && error.validation)
+          setEvaluation({ totals: null, validation: error.validation });
       }
     } finally {
       if (!controller.signal.aborted && version === revision.current)
@@ -157,7 +157,6 @@ export function OutgoingInvoiceForm({
     revision.current++;
     evaluationRequest.current?.abort();
     setEvaluation(undefined);
-    setIssues([]);
     setValidationError("");
     setValidating(false);
     setDirty(true);
@@ -196,16 +195,14 @@ export function OutgoingInvoiceForm({
         ?.scrollIntoView({ block: "center", behavior: "instant" });
   }
   function errorFor(field: string, index?: number) {
-    return [...(evaluation?.validation.issues ?? []), ...issues].find(
-      (issue) => {
-        const target = issueTarget(issue);
-        return (
-          issue.severity === "ERROR" &&
-          target.field === field &&
-          target.index === index
-        );
-      },
-    )?.message;
+    return (evaluation?.validation.issues ?? []).find((issue) => {
+      const target = issueTarget(issue);
+      return (
+        issue.severity === "ERROR" &&
+        target.field === field &&
+        target.index === index
+      );
+    })?.message;
   }
   async function save() {
     if (!draft || !context || locked.current || conflict || uncertain) return;
@@ -238,7 +235,6 @@ export function OutgoingInvoiceForm({
       setSaved(result);
       setEvaluation(result);
       setDirty(false);
-      setIssues([]);
       setValidationError("");
       const detail = readDetail(
         await studioRequest(
@@ -255,9 +251,9 @@ export function OutgoingInvoiceForm({
       );
     } catch (error) {
       if (error instanceof StudioRequestError) {
-        setIssues(error.issues ?? []);
-        if (error.status === 409 && saved && !error.issues?.length)
-          setConflict(true);
+        if (error.validation)
+          setEvaluation({ totals: null, validation: error.validation });
+        if (error.code === "DRAFT_CONFLICT") setConflict(true);
       }
       if (accepted)
         setMessage(
@@ -289,13 +285,15 @@ export function OutgoingInvoiceForm({
     setBusy("ready");
     setMessage("");
     try {
-      await studioRequest(
-        `/api/outgoing-invoices/${encodeURIComponent(saved.id)}/ready`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ expectedUpdatedAt: saved.updatedAt }),
-        },
+      readSaved(
+        await studioRequest(
+          `/api/outgoing-invoices/${encodeURIComponent(saved.id)}/ready`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expectedUpdatedAt: saved.updatedAt }),
+          },
+        ),
       );
       const detail = readDetail(
         await studioRequest(
@@ -314,8 +312,12 @@ export function OutgoingInvoiceForm({
       setEvaluation(undefined);
       setMessage((error as Error).message);
       if (error instanceof StudioRequestError) {
-        setIssues(error.issues ?? []);
-        if (error.status === 409 && !error.issues?.length) setConflict(true);
+        if (error.code === "DRAFT_CONFLICT") setConflict(true);
+        if (error.validation)
+          setEvaluation({
+            totals: snapshot?.totals ?? null,
+            validation: error.validation,
+          });
       }
     } finally {
       locked.current = false;
@@ -327,7 +329,7 @@ export function OutgoingInvoiceForm({
       <div className="invoice-studio studio-card p-6" aria-busy={!loadError}>
         <h2 className="text-lg font-semibold">
           {loadError
-            ? "Invoice Studio está pendiente de integración"
+            ? "No pudimos abrir Invoice Studio"
             : "Preparando tu espacio de facturación…"}
         </h2>
         <p
@@ -357,11 +359,12 @@ export function OutgoingInvoiceForm({
         )}
       </div>
     );
+  const client = context.clients.find((item) => item.id === draft.clientId);
   const receiver =
-    snapshot?.clientId === draft.clientId
-      ? snapshot.receiverSnapshot
-      : context.clients.find((client) => client.id === draft.clientId);
-  const issuer = snapshot?.issuerSnapshot ?? context.issuer;
+    snapshot?.clientId === draft.clientId && snapshot.receiverSnapshot
+      ? { ...client, ...snapshot.receiverSnapshot, id: draft.clientId }
+      : client;
+  const issuer = { ...context.issuer, ...snapshot?.issuerSnapshot };
   const canReady =
     !!saved &&
     snapshot?.updatedAt === saved.updatedAt &&
@@ -471,14 +474,14 @@ export function OutgoingInvoiceForm({
               keys={keys}
               onKeysChange={setKeys}
               onChange={(lines) => change("concepts", lines)}
-              totals={evaluation?.totals}
+              totals={evaluation?.totals ?? undefined}
               currency={draft.currency}
               errorFor={errorFor}
             />
           </fieldset>
           <aside className="studio-summary">
             <TotalsSummary
-              totals={evaluation?.totals}
+              totals={evaluation?.totals ?? undefined}
               currency={draft.currency}
               busy={validating}
             />
@@ -486,7 +489,6 @@ export function OutgoingInvoiceForm({
               result={evaluation?.validation}
               busy={validating}
               error={validationError}
-              issues={issues}
               onFocusIssue={focusIssue}
             />
             <Button
@@ -551,7 +553,7 @@ export function OutgoingInvoiceForm({
           receiver={receiver}
           draft={draft}
           folio={saved?.folio}
-          totals={evaluation?.totals}
+          totals={evaluation?.totals ?? undefined}
           validation={evaluation?.validation}
           busy={!!busy}
           canReady={canReady}

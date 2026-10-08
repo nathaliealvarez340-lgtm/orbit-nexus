@@ -1,23 +1,12 @@
 import type {
   CatalogOption,
   CreateInvoiceDraftRequest,
-  CreateInvoiceDraftResponse,
+  InvoiceDraftDetail,
   InvoiceStudioContext,
-  InvoiceStudioClient,
   InvoiceValidationIssue,
   SavedInvoiceConcept,
 } from "@/types/invoice-studio";
 
-// UI projection of section 26. The definitive detail DTO belongs to Claude.
-export type DraftDetail = CreateInvoiceDraftRequest &
-  CreateInvoiceDraftResponse & {
-    issuerSnapshot: InvoiceStudioContext["issuer"];
-    receiverSnapshot: InvoiceStudioClient;
-  };
-export type Evaluation = Pick<
-  CreateInvoiceDraftResponse,
-  "totals" | "validation"
->;
 export const sectionLabels = {
   issuer: "Emisor",
   receiver: "Receptor",
@@ -75,15 +64,22 @@ export function conceptSnapshot(
     withholdingIsrRate: concept.withholdingIsrRate,
   };
 }
-export function draftRequest(detail: DraftDetail): CreateInvoiceDraftRequest {
+export function draftRequest(
+  detail: InvoiceDraftDetail,
+): CreateInvoiceDraftRequest {
+  if (!["I", "E", "T"].includes(detail.documentType))
+    throw new Error(
+      "Este tipo de comprobante no puede editarse en Invoice Studio.",
+    );
   // Explicit whitelist: never send issuer, organizationId, status, folio or totals.
   return {
-    clientId: detail.clientId,
-    invoiceDate: detail.invoiceDate,
-    documentType: detail.documentType,
+    clientId: detail.clientId ?? "",
+    invoiceDate: detail.invoiceDate ?? "",
+    documentType:
+      detail.documentType as CreateInvoiceDraftRequest["documentType"],
     currency: detail.currency,
     exchangeRate: detail.exchangeRate,
-    cfdiUse: detail.cfdiUse,
+    cfdiUse: detail.cfdiUse ?? "",
     paymentMethod: detail.paymentMethod,
     paymentForm: detail.paymentForm,
     exportCode: detail.exportCode,

@@ -7,6 +7,7 @@ import type {
 } from "@/types/invoice-studio";
 import { Button } from "@/components/ui/button";
 import { CatalogCombobox } from "./catalog-combobox";
+import { SavedConceptPicker } from "./saved-concept-picker";
 import {
   PercentField,
   StudioField,
@@ -78,28 +79,10 @@ export function ConceptEditor({
       copy="Productos y servicios de esta factura. Editar una línea conserva el concepto original del catálogo."
     >
       <div className="studio-field-grid mb-5">
-        <CatalogCombobox
-          label="Agregar concepto guardado"
-          showCode={false}
-          options={context.savedConcepts
-            .filter((concept) => concept.active)
-            .map((concept) => ({
-              code: concept.id,
-              label: `${concept.name} · ${concept.description}`,
-              active: true,
-            }))}
-          onChange={(id) => {
-            const concept = context.savedConcepts.find(
-              (item) => item.id === id,
-            );
-            if (concept && concepts.length < 100)
-              append(conceptSnapshot(concept));
+        <SavedConceptPicker
+          onSelect={(concept) => {
+            if (concepts.length < 100) append(conceptSnapshot(concept));
           }}
-          help={
-            context.savedConcepts.length
-              ? "Se agrega una copia editable a esta factura."
-              : "Todavía no hay conceptos guardados. Puedes capturar una línea manual."
-          }
         />
       </div>
       <div ref={container} className="space-y-4">
@@ -159,7 +142,7 @@ export function ConceptEditor({
                 field="productCode"
                 conceptIndex={index}
                 value={line.productCode}
-                endpoint="/api/fiscal-catalogs/productCode"
+                endpoint="/api/fiscal-catalogs/product-services"
                 onChange={(value) => update(index, "productCode", value)}
                 error={errorFor("productCode", index)}
                 help="La cobertura y validez de la clave se verifican en servidor."
@@ -169,7 +152,7 @@ export function ConceptEditor({
                 field="unitCode"
                 conceptIndex={index}
                 value={line.unitCode}
-                endpoint="/api/fiscal-catalogs/unitCode"
+                endpoint="/api/fiscal-catalogs/units"
                 onChange={(value) => update(index, "unitCode", value)}
                 error={errorFor("unitCode", index)}
               />

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -11,7 +11,7 @@ import { startDatabase } from "./local-database.mjs";
 
 // All SQL, including issued-invoice fixtures and plan changes, targets ephemeral PGlite.
 const database = await startDatabase(),
-  port = 3199,
+  port = Number(process.env.PORT || 3199),
   baseURL = `http://localhost:${port}`;
 const app = spawn(
   process.execPath,
@@ -102,7 +102,12 @@ try {
       throw new Error("Local test server did not start");
     await new Promise((r) => setTimeout(r, 250));
   }
-  browser = await chromium.launch({ channel: "chrome", headless: true });
+  browser = await chromium.launch({
+    channel:
+      process.env.PLAYWRIGHT_CHANNEL ??
+      (process.platform === "win32" ? "msedge" : "chrome"),
+    headless: true,
+  });
   const a = await account("PhaseThreeA"),
     b = await account("PhaseThreeB"),
     anon = await browser.newContext({ baseURL });
@@ -429,14 +434,43 @@ try {
   ).toBeVisible();
   await page.goto("/dashboard/invoices/new");
   await page
-    .getByLabel("Descripción", { exact: true })
+    .getByLabel("Cliente receptor", { exact: true })
+    .fill("Cliente actualizado UI");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page
+    .getByLabel("Descripción · Concepto 1", { exact: true })
     .fill("Concepto creado por UI");
-  await page.getByLabel("Precio unitario", { exact: true }).fill("100.00");
-  await page.getByRole("button", { name: "Guardar y ver borrador" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/invoices\/drafts\//);
+  await page
+    .getByLabel("Precio unitario · Concepto 1", { exact: true })
+    .fill("100.00");
+  for (const [label, query] of [
+    ["Clave producto/servicio · Concepto 1", "01010101"],
+    ["Unidad · Concepto 1", "ACT"],
+  ]) {
+    await page.getByLabel(label, { exact: true }).fill(query);
+    await expect(
+      page.getByRole("option", { name: new RegExp(query) }),
+    ).toBeVisible();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+  }
+  await page
+    .getByRole("button", { name: "Guardar borrador", exact: true })
+    .click();
   await expect(
-    page.getByText("Concepto creado por UI", { exact: true }),
+    page.getByText(
+      "Borrador guardado. Puedes continuar editando o revisar el documento.",
+      { exact: true },
+    ),
   ).toBeVisible();
+  await page
+    .getByRole("link", { name: "Abrir borrador guardado", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/dashboard\/invoices\/new\?draft=/);
+  await expect(
+    page.getByLabel("Descripción · Concepto 1", { exact: true }),
+  ).toHaveValue("Concepto creado por UI");
   pass(
     "transparent logo and tenant settings validated; concurrent drafts allocate unique atomic folios, exact decimals and immutable client snapshots; no fake issuance",
   );
@@ -1051,7 +1085,12 @@ try {
   throw error;
 } finally {
   await browser?.close();
-  app.kill();
+  if (app.exitCode === null && process.platform === "win32")
+    execFileSync("taskkill", ["/PID", String(app.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+  else app.kill();
   if (app.exitCode === null)
     await new Promise((resolve) => app.once("exit", resolve));
   await database.close();

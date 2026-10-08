@@ -1,6 +1,5 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import {
   conceptSnapshot,
   draftRequest,
@@ -13,6 +12,9 @@ import {
   readDetail,
   readSaved,
   readEvaluation,
+  readCatalog,
+  StudioRequestError,
+  studioRequest,
 } from "../src/components/invoice-studio/transport";
 import type {
   InvoiceStudioContext,
@@ -121,37 +123,76 @@ test("new invoices do not silently select a client or invent a payment form", ()
   assert.equal(draft.paymentForm, undefined);
   assert.equal(draft.concepts[0].productCode, "");
 });
-test("temporary shared declarations match the canonical document verbatim", async () => {
-  const contract = await readFile("docs/tasks/FASE5-CONTRACT.md", "utf8");
-  const declaration = await readFile(
-    "src/components/invoice-studio/pending-contract.d.ts",
-    "utf8",
+const validation = {
+  valid: false,
+  canMarkReady: false,
+  sections: {
+    issuer: "OK",
+    receiver: "OK",
+    document: "OK",
+    payment: "OK",
+    concepts: "ERROR",
+    totals: "OK",
+  },
+  issues: [
+    {
+      code: "FIELD_INVALID",
+      severity: "ERROR",
+      section: "concepts",
+      field: "quantity",
+      conceptIndex: 0,
+      message: "Cantidad válida",
+    },
+  ],
+} as const;
+test("structural validation preserves backend issues when official totals are null", () => {
+  const result = readEvaluation({ totals: null, validation });
+  assert.equal(result.totals, null);
+  assert.equal(result.validation.issues[0].field, "quantity");
+  assert.throws(() =>
+    readSaved({
+      id: "test",
+      folio: null,
+      status: "DRAFT",
+      updatedAt: new Date().toISOString(),
+      ...result,
+    }),
   );
-  const normalize = (text: string) =>
-    text.replace(/\s+/g, "").replace(/:\|/g, ":");
-  const block = (text: string, name: string) => {
-    const start = text.indexOf(`export type ${name} = {`);
-    let depth = 0;
-    for (
-      let position = text.indexOf("{", start);
-      position < text.length;
-      position++
-    ) {
-      if (text[position] === "{") depth++;
-      if (text[position] === "}" && --depth === 0)
-        return text.slice(start, position + 2);
-    }
-    return "missing";
+});
+test("SAT search reads the real coverage envelope rather than accepting a bare option array", () => {
+  const payload = {
+    catalog: "units",
+    source: "CURATED_SUBSET",
+    complete: false,
+    results: [{ code: "E48", label: "Unidad de servicio", active: true }],
   };
-  const names = [...declaration.matchAll(/export type (\w+) =/g)].map(
-    (match) => match[1],
-  );
-  for (const name of names) {
-    assert.equal(
-      normalize(block(declaration, name)),
-      normalize(block(contract, name)),
-      name,
-    );
+  assert.deepEqual(readCatalog(payload), payload);
+  assert.throws(() => readCatalog(payload.results));
+});
+test("transport distinguishes DRAFT_CONFLICT from configuration 409 and retains fiscal validation", async () => {
+  const original = globalThis.fetch;
+  try {
+    for (const code of [
+      "DRAFT_CONFLICT",
+      "INVOICE_SETTINGS_REQUIRED",
+      "NOT_READY",
+    ]) {
+      globalThis.fetch = async () =>
+        new Response(
+          JSON.stringify({ code, error: "Revisa el borrador", validation }),
+          { status: code === "NOT_READY" ? 422 : 409 },
+        );
+      await assert.rejects(
+        studioRequest("/api/outgoing-invoices/test"),
+        (error: unknown) => {
+          assert.ok(error instanceof StudioRequestError);
+          assert.equal(error.code, code);
+          assert.equal(error.issues?.[0].conceptIndex, 0);
+          return true;
+        },
+      );
+    }
+  } finally {
+    globalThis.fetch = original;
   }
-  assert.equal(names.length, 11);
 });

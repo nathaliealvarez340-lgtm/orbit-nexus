@@ -9,13 +9,11 @@ export function ValidationPanel({
   result,
   busy,
   error,
-  issues = [],
   onFocusIssue,
 }: {
   result?: InvoiceValidationResult;
   busy: boolean;
   error?: string;
-  issues?: InvoiceValidationIssue[];
   onFocusIssue: (issue: InvoiceValidationIssue) => void;
 }) {
   return (
@@ -77,9 +75,9 @@ export function ValidationPanel({
           );
         })}
       </ul>
-      {!!(result?.issues.length || issues.length) && (
+      {!!result?.issues.length && (
         <ul className="studio-validation-issues mt-5 space-y-2 border-t border-white/10 pt-4">
-          {[...(result?.issues ?? []), ...issues].map((issue, index) => (
+          {result.issues.map((issue, index) => (
             <li key={`${issue.code}-${index}`}>
               <button
                 type="button"

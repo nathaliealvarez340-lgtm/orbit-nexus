@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import type { CatalogOption } from "@/types/invoice-studio";
-import { readOptions, studioRequest } from "./transport";
+import { readCatalog, studioRequest } from "./transport";
 
 const emptyOptions: CatalogOption[] = [];
 export function CatalogCombobox({
@@ -11,6 +11,7 @@ export function CatalogCombobox({
   onChange,
   options = emptyOptions,
   endpoint,
+  loadOptions,
   help,
   error,
   field,
@@ -22,6 +23,10 @@ export function CatalogCombobox({
   onChange: (value: string) => void;
   options?: CatalogOption[];
   endpoint?: string;
+  loadOptions?: (
+    query: string,
+    signal: AbortSignal,
+  ) => Promise<CatalogOption[]>;
   help?: string;
   error?: string;
   field?: string;
@@ -38,6 +43,7 @@ export function CatalogCombobox({
     options: CatalogOption[];
     error?: string;
     loading: boolean;
+    complete?: boolean;
   }>({ query: "", options: [], loading: false });
   const [picked, setPicked] = useState<CatalogOption>();
   const selected =
@@ -50,7 +56,8 @@ export function CatalogCombobox({
     : value
       ? `${value} · Pendiente de verificar`
       : "";
-  const filtered = endpoint
+  const isRemote = !!endpoint || !!loadOptions;
+  const filtered = isRemote
     ? remote.query === query
       ? remote.options
       : emptyOptions
@@ -61,22 +68,48 @@ export function CatalogCombobox({
             .includes(query.toLocaleLowerCase("es")),
         )
         .slice(0, 30);
-  const busy = !!endpoint && (remote.query !== query || remote.loading);
+  const busy = isRemote && (remote.query !== query || remote.loading);
+  // Resolve persisted SAT codes through the same source used for search. A saved
+  // code has no label in the detail DTO; never substitute a client-side catalog.
   useEffect(() => {
-    if (!open || !endpoint) return;
+    if (!endpoint || !value || picked?.code === value) return;
+    const controller = new AbortController();
+    studioRequest(`${endpoint}?q=${encodeURIComponent(value)}&limit=30`, {
+      signal: controller.signal,
+    })
+      .then(readCatalog)
+      .then((catalog) => {
+        if (!controller.signal.aborted)
+          setPicked(catalog.results.find((option) => option.code === value));
+      })
+      .catch(() => {
+        // Keep the code visible. Its fiscal status still comes from validation.
+      });
+    return () => controller.abort();
+  }, [endpoint, value, picked?.code]);
+  useEffect(() => {
+    if (!open || (!endpoint && !loadOptions)) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setRemote({ query, options: [], loading: true });
       try {
-        const separator = endpoint.includes("?") ? "&" : "?";
-        const result = readOptions(
-          await studioRequest(
-            `${endpoint}${separator}q=${encodeURIComponent(query)}&limit=30`,
-            { signal: controller.signal },
-          ),
-        );
+        const catalog = endpoint
+          ? readCatalog(
+              await studioRequest(
+                `${endpoint}?q=${encodeURIComponent(query)}&limit=30`,
+                { signal: controller.signal },
+              ),
+            )
+          : undefined;
+        const result =
+          catalog?.results ?? (await loadOptions!(query, controller.signal));
         if (!controller.signal.aborted)
-          setRemote({ query, options: result, loading: false });
+          setRemote({
+            query,
+            options: result,
+            loading: false,
+            complete: catalog?.complete,
+          });
       } catch (failure) {
         if (!controller.signal.aborted)
           setRemote({
@@ -91,7 +124,7 @@ export function CatalogCombobox({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, endpoint, open]);
+  }, [query, endpoint, loadOptions, open]);
   useEffect(() => {
     if (open && active >= 0)
       document
@@ -218,7 +251,15 @@ export function CatalogCombobox({
           {!busy && !filtered.length && (
             <p className="p-3 text-sm text-zinc-400" role="status">
               {remote.error ??
-                "Sin coincidencias. Prueba otro código o descripción."}
+                (remote.complete === false
+                  ? "Sin coincidencias en la cobertura disponible. El catálogo SAT completo aún no está cargado."
+                  : "Sin coincidencias. Prueba otro código o descripción.")}
+            </p>
+          )}
+          {remote.complete === false && !!filtered.length && (
+            <p className="p-3 text-xs text-zinc-400">
+              Cobertura parcial del catálogo SAT. El servidor verifica las
+              claves disponibles.
             </p>
           )}
         </div>
