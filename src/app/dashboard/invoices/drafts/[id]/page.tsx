@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { requirePageTenant } from "@/lib/tenant";
 import { tenantPlan } from "@/services/plans";
 import { getOutgoingInvoice } from "@/services/outgoing-invoices";
@@ -29,6 +30,16 @@ export default async function Page({
         eyebrow="Vista previa · Preparación"
         title={invoice.folio ?? "Borrador"}
         copy="Timbrado pendiente de integración PAC. Este documento no tiene validez como CFDI."
+        action={
+          <Link
+            className="text-sm text-violet-300 underline"
+            href={
+              "/dashboard/invoices/new?draft=" + encodeURIComponent(invoice.id)
+            }
+          >
+            Editar en Invoice Studio
+          </Link>
+        }
       />
       <article
         className="surface p-6 md:p-9"
