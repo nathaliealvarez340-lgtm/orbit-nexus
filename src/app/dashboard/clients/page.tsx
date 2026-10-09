@@ -3,6 +3,11 @@ import { listClients } from "@/services/clients";
 import { ClientEditor } from "@/components/forms/client-editor";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
+import {
+  cfdiUseCatalog,
+  fiscalRegimeCatalog,
+  paymentFormCatalog,
+} from "@/lib/sat-catalogs";
 export default async function Page({
   searchParams,
 }: {
@@ -40,7 +45,14 @@ export default async function Page({
           Buscar
         </Button>
       </form>
-      <ClientEditor clients={JSON.parse(JSON.stringify(clients))} />
+      <ClientEditor
+        clients={JSON.parse(JSON.stringify(clients))}
+        catalogs={{
+          fiscalRegimes: fiscalRegimeCatalog,
+          cfdiUses: cfdiUseCatalog,
+          paymentForms: paymentFormCatalog,
+        }}
+      />
       {clients.length === 500 && (
         <p className="text-sm text-zinc-400">
           Mostrando 500 resultados. Refina la búsqueda.

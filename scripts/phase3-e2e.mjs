@@ -224,10 +224,22 @@ try {
   await page
     .getByLabel("Nombre / razón social", { exact: true })
     .fill("Cliente actualizado UI");
+  await expect(
+    page.getByRole("checkbox", {
+      name: "Revisé y confirmo que los datos fiscales del cliente son correctos.",
+    }),
+  ).not.toBeChecked();
+  await page
+    .getByRole("checkbox", {
+      name: "Revisé y confirmo que los datos fiscales del cliente son correctos.",
+    })
+    .check();
   await page
     .getByRole("button", { name: "Guardar cliente", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText("Cliente guardado");
+  await expect(page.getByRole("status")).toContainText(
+    "✓ Información guardada correctamente",
+  );
   pass(
     "client create/update is real, ignores client tenant IDs, blocks foreign access and bad origins",
   );
@@ -275,8 +287,15 @@ try {
       { exact: true },
     ),
   ).toBeVisible();
-  assert.equal(await page.locator('select[name="cfdiUse"]').count(), 1);
-  assert.equal(await page.locator('input[name="cfdiUse"]').count(), 0);
+  await expect(
+    page.getByRole("combobox", {
+      name: "Uso CFDI predeterminado",
+      exact: true,
+    }),
+  ).toHaveValue(/G03 ·/);
+  await expect(
+    page.locator('input[type="hidden"][name="cfdiUse"]'),
+  ).toHaveValue("G03");
   const pdfDoc = await PDFDocument.create();
   pdfDoc.addPage().drawText("SYNTHETIC CSF FOR LOCAL TEST ONLY");
   const pdf = Buffer.from(await pdfDoc.save());
@@ -510,7 +529,16 @@ try {
   const report = reports.find(
     (r) => r.year === year && r.month === priorMonth.getUTCMonth() + 1,
   );
-  assert(report);
+  assert(
+    report,
+    JSON.stringify({
+      expectedPeriod: { year, month: priorMonth.getUTCMonth() + 1 },
+      returnedPeriods: reports.map((item) => ({
+        year: item.year,
+        month: item.month,
+      })),
+    }),
+  );
   assert.equal(report.total, "203.95");
   assert.equal(report.ticketCount, 2);
   assert.equal(report.invoiceCount, 1);
@@ -928,10 +956,10 @@ try {
     await reportsLink.focus();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/dashboard\/reports$/);
-    await expect(sidebar).toHaveAttribute("data-expanded", "true");
+    await expect(sidebar).toHaveAttribute("data-expanded", "false");
     await expect
       .poll(async () => Math.round((await sidebar.boundingBox()).width))
-      .toBe(240);
+      .toBe(68);
     await expect(reportsLink).toHaveAttribute("aria-current", "page");
     const invoiceToggle = sidebar.getByRole("button", {
       name: "Facturas",
@@ -947,6 +975,9 @@ try {
       .getByRole("link", { name: "CFDI emitidos", exact: true })
       .click();
     await expect(page).toHaveURL(/\/dashboard\/invoices\/issued$/);
+    await expect(sidebar).toHaveAttribute("data-expanded", "false");
+    await invoiceToggle.click();
+    await expect(sidebar).toHaveAttribute("data-expanded", "true");
     await expect(invoiceToggle.locator("..")).toHaveAttribute(
       "data-active",
       "true",
@@ -981,12 +1012,21 @@ try {
     await expect(page).toHaveURL(/\/dashboard\/invoices\/issued$/);
     await sidebar.getByRole("link", { name: "Tickets", exact: true }).click();
     await expect(page).toHaveURL(/\/dashboard\/tickets$/);
+    await expect(sidebar).toHaveAttribute("data-expanded", "false");
     await expect(invoiceToggle).toHaveAttribute("aria-expanded", "false");
     await expect(
-      sidebar.getByRole("link", { name: "CFDI recibidos", exact: true }),
+      sidebar.getByRole("link", {
+        name: "CFDI recibidos",
+        exact: true,
+        includeHidden: true,
+      }),
     ).toHaveAttribute("href", "/dashboard/invoices");
     await expect(
-      sidebar.getByRole("link", { name: "Documentos fiscales", exact: true }),
+      sidebar.getByRole("link", {
+        name: "Documentos fiscales",
+        exact: true,
+        includeHidden: true,
+      }),
     ).toHaveAttribute("href", "/dashboard/fiscal-documents");
     assert(
       await page.evaluate(

@@ -3,6 +3,62 @@
   --orbit-accent: #8b5cf6;
   --orbit-accent-soft: #c4b5fd;
 }
+.orbit-topbar {
+  border-bottom: 1px solid #ffffff12;
+  background: #0c0c0ff2;
+  box-shadow: 0 6px 24px #0002;
+}
+@supports (backdrop-filter: blur(16px)) {
+  .orbit-topbar {
+    background: #0c0c0fd6;
+    backdrop-filter: blur(16px);
+  }
+}
+.orbit-cookie-layer {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  width: calc(100% - 24px);
+  max-width: 448px;
+  z-index: 70;
+}
+.orbit-cookie-banner {
+  max-height: min(70dvh, calc(100dvh - 180px));
+}
+.orbit-cookie-preferences {
+  min-height: 44px;
+}
+.orbit-cookie-modal {
+  position: sticky;
+  bottom: 0;
+  left: auto;
+  right: auto;
+  width: 100%;
+  max-width: none;
+  flex-shrink: 0;
+  margin-top: 12px;
+}
+.orbit-cookie-modal .orbit-cookie-banner {
+  max-height: 42dvh;
+  padding: 14px;
+}
+.orbit-cookie-layer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.orbit-workspace main {
+  padding-bottom: max(112px, calc(var(--orbit-privacy-space, 56px) + 24px));
+}
+@media (max-width: 1023px) {
+  .orbit-cookie-banner {
+    max-height: 70dvh;
+  }
+  .orbit-app > [aria-label="Capturar ticket"] {
+    bottom: max(24px, calc(var(--orbit-privacy-space, 56px) + 16px));
+  }
+}
 .orbit-app :is(.text-zinc-500, .text-zinc-600) {
   color: #a1a1aa;
 }
@@ -53,7 +109,7 @@
 }
 .orbit-sidebar {
   position: fixed;
-  inset: 14px auto 14px 14px;
+  inset: 14px auto max(14px, calc(var(--orbit-privacy-space, 56px) + 12px)) 14px;
   z-index: 40;
   display: none;
   width: 68px;

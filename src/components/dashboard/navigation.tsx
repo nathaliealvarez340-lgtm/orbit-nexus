@@ -209,7 +209,6 @@ function NavigationGroups({
                         }
                         className="orbit-nav-item"
                         onClick={() => {
-                          onExpand?.();
                           if (item.children) setOpenModule(item.label);
                           onNavigate?.();
                         }}

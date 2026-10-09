@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { requirePageTenant } from "@/lib/tenant";
 import { fiscalProfileComplete, addressFields } from "@/lib/fiscal-catalogs";
 import { getDb } from "@/lib/db";
+import { cfdiUseCatalog, fiscalRegimeCatalog } from "@/lib/sat-catalogs";
 export default async function Page({
   searchParams,
 }: {
@@ -41,7 +42,7 @@ export default async function Page({
       <PageHeader
         eyebrow="Identidad fiscal"
         title="Perfil fiscal"
-        copy="Revisa y confirma los datos del receptor de tu organización."
+        copy="Revisa y confirma la identidad fiscal de tu organización como emisor."
       />
       {source && (
         <div className="surface p-5 text-sm text-zinc-400">
@@ -56,8 +57,13 @@ export default async function Page({
           : "Perfil incompleto · Completa la dirección y adjunta la constancia PDF"}
       </p>
       <FiscalForm
-        key={document || profile?.updatedAt.toISOString() || "new"}
-        initial={{ ...current, ...extracted }}
+        key={`${organizationId}:${document || "profile"}`}
+        initial={current}
+        sourceValues={extracted}
+        catalogs={{
+          fiscalRegimes: fiscalRegimeCatalog,
+          cfdiUses: cfdiUseCatalog,
+        }}
         documentId={document}
         readOnly={role === "MEMBER"}
       />

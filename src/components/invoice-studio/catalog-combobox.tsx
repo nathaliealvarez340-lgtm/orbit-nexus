@@ -17,6 +17,8 @@ export function CatalogCombobox({
   field,
   conceptIndex,
   showCode = true,
+  name,
+  disabled = false,
 }: {
   label: string;
   value?: string;
@@ -32,6 +34,8 @@ export function CatalogCombobox({
   field?: string;
   conceptIndex?: number;
   showCode?: boolean;
+  name?: string;
+  disabled?: boolean;
 }) {
   const id = useId(),
     input = useRef<HTMLInputElement>(null);
@@ -88,7 +92,7 @@ export function CatalogCombobox({
     return () => controller.abort();
   }, [endpoint, value, picked?.code]);
   useEffect(() => {
-    if (!open || (!endpoint && !loadOptions)) return;
+    if (disabled || !open || (!endpoint && !loadOptions)) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setRemote({ query, options: [], loading: true });
@@ -124,7 +128,7 @@ export function CatalogCombobox({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [query, endpoint, loadOptions, open]);
+  }, [query, endpoint, loadOptions, open, disabled]);
   useEffect(() => {
     if (open && active >= 0)
       document
@@ -141,16 +145,18 @@ export function CatalogCombobox({
   }
   return (
     <div className="studio-field studio-combobox">
+      {name && <input type="hidden" name={name} value={value ?? ""} />}
       <label htmlFor={id}>{label}</label>
       <div className="relative">
         <input
           id={id}
           ref={input}
+          disabled={disabled}
           role="combobox"
           className="input pr-10"
           aria-autocomplete="list"
           aria-expanded={open}
-          aria-controls={id + "-list"}
+          aria-controls={open ? id + "-list" : undefined}
           aria-activedescendant={
             open && active >= 0 && filtered[active]
               ? `${id}-option-${active}`
@@ -250,10 +256,11 @@ export function CatalogCombobox({
           )}
           {!busy && !filtered.length && (
             <p className="p-3 text-sm text-zinc-400" role="status">
-              {remote.error ??
-                (remote.complete === false
+              {remote.error
+                ? "No pudimos cargar el catálogo. Cierra el selector y vuelve a abrirlo para intentar otra vez."
+                : remote.complete === false
                   ? "Sin coincidencias en la cobertura disponible. El catálogo SAT completo aún no está cargado."
-                  : "Sin coincidencias. Prueba otro código o descripción.")}
+                  : "Sin coincidencias. Prueba otro código o descripción."}
             </p>
           )}
           {remote.complete === false && !!filtered.length && (

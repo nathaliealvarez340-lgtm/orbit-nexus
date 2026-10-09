@@ -11,6 +11,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { catalogLabel, formatAmount, shiftDecimal } from "./model";
 import { TotalsSummary } from "./totals-summary";
+import { usePrivacyLayer } from "@/components/privacy/privacy-layer";
 
 export function InvoicePreview({
   mode,
@@ -43,15 +44,18 @@ export function InvoicePreview({
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
     title = useId();
+  const setPrivacyHost = usePrivacyLayer()?.setHost;
   useEffect(() => {
     const element = dialog.current,
       opener = document.activeElement as HTMLElement | null;
     element?.showModal();
+    setPrivacyHost?.(element);
     return () => {
       element?.close();
+      setPrivacyHost?.(null);
       opener?.focus();
     };
-  }, []);
+  }, [setPrivacyHost]);
   return (
     <dialog
       ref={dialog}

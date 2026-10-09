@@ -8,6 +8,8 @@ import { parseConsent } from "@/lib/consent";
 import { getDb } from "@/lib/db";
 import type { CSSProperties } from "react";
 import "./dashboard.css";
+import "@/components/fiscal/fiscal.css";
+import { PrivacyLayerProvider } from "@/components/privacy/privacy-layer";
 export default async function DashboardLayout({
   children,
 }: {
@@ -35,19 +37,21 @@ export default async function DashboardLayout({
         } as CSSProperties
       }
     >
-      <Sidebar />
-      <div className="orbit-workspace">
-        <Topbar
-          user={tenant.user}
-          organizationId={tenant.organizationId}
-          memberships={tenant.memberships}
-        />
-        <main className="mx-auto max-w-[1500px] p-5 pb-28 md:p-8 md:pb-28">
-          {children}
-        </main>
-      </div>
-      <FloatingCapture />
-      <CookieConsent initial={consent} />
+      <PrivacyLayerProvider>
+        <Sidebar />
+        <div className="orbit-workspace">
+          <Topbar
+            user={tenant.user}
+            organizationId={tenant.organizationId}
+            memberships={tenant.memberships}
+          />
+          <main className="mx-auto max-w-[1500px] p-5 pb-28 md:p-8 md:pb-28">
+            {children}
+          </main>
+        </div>
+        <FloatingCapture />
+        <CookieConsent initial={consent} />
+      </PrivacyLayerProvider>
     </div>
   );
 }

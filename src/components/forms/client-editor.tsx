@@ -1,179 +1,73 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { addressFields, cfdiUses, paymentForms } from "@/lib/fiscal-catalogs";
-type ClientData = {
-  id: string;
-  legalName: string;
-  rfc: string;
+import { ClientFiscalForm } from "@/components/fiscal/client-fiscal-form";
+import type {
+  InvoiceFiscalCatalogs,
+  InvoiceStudioClient,
+} from "@/types/invoice-studio";
+type ClientData = InvoiceStudioClient & {
   email: string;
   archivedAt: string | null;
   [key: string]: unknown;
 };
-const fields = [
-  ["rfc", "RFC"],
-  ["legalName", "Nombre / razón social"],
-  ["internalNumber", "Número interno (opcional)"],
-  ["foreignTaxId", "Registro fiscal extranjero (opcional)"],
-  ["fiscalRegime", "Régimen fiscal (clave de tres dígitos)"],
-  ["phone", "Teléfono (opcional)"],
-  ["email", "Correo"],
-  ["postalCode", "Código postal"],
-  ...addressFields,
-  ["reference", "Referencia (opcional)"],
-  ["notes", "Notas (opcional)"],
-];
-export function ClientEditor({ clients }: { clients: ClientData[] }) {
-  const [editing, setEditing] = useState<ClientData | null>(null),
-    [open, setOpen] = useState(false),
-    [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+export function ClientEditor({
+  clients,
+  catalogs,
+}: {
+  clients: ClientData[];
+  catalogs: Pick<
+    InvoiceFiscalCatalogs,
+    "fiscalRegimes" | "cfdiUses" | "paymentForms"
+  >;
+}) {
+  const [editing, setEditing] = useState<ClientData | null>(null);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
   const router = useRouter();
+  const close = () => {
+    setOpen(false);
+    requestAnimationFrame(() => opener.current?.focus());
+  };
   return (
-    <div className="space-y-6">
+    <div className="fiscal-ui space-y-6">
       <Button
-        onClick={() => {
+        onClick={(event) => {
+          opener.current = event.currentTarget;
           setEditing(null);
           setOpen(true);
           setMessage("");
+          setFailed(false);
         }}
       >
         Nuevo cliente
       </Button>
       {open && (
-        <form
+        <ClientFiscalForm
           key={editing?.id ?? "new"}
-          className="surface p-6"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (busy) return;
-            const values = Object.fromEntries(new FormData(e.currentTarget));
-            setBusy(true);
-            setMessage("");
-            try {
-              const response = await fetch(
-                  "/api/clients" + (editing ? "/" + editing.id : ""),
-                  {
-                    method: editing ? "PATCH" : "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      ...values,
-                      additionalEmails: String(values.additionalEmails || "")
-                        .split(/[;,]/)
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    }),
-                  },
-                ),
-                result = await response.json();
-              if (!response.ok)
-                throw new Error(
-                  result.fields
-                    ? Object.values(result.fields).flat().join(" ")
-                    : result.error,
-                );
-              setOpen(false);
-              setMessage("Cliente guardado.");
-              router.refresh();
-            } catch (error) {
-              setMessage((error as Error).message);
-            } finally {
-              setBusy(false);
-            }
+          initial={editing}
+          catalogs={catalogs}
+          onCancel={close}
+          onSaved={() => {
+            close();
+            setFailed(false);
+            setMessage("✓ Información guardada correctamente");
+            router.refresh();
           }}
-        >
-          <h2 className="mb-5 font-medium">
-            {editing ? "Editar cliente" : "Datos del cliente"}
-          </h2>
-          <fieldset disabled={busy}>
-            <div className="grid gap-4 md:grid-cols-2">
-              {fields.map(([key, label]) => (
-                <label key={key} className="text-sm text-zinc-400">
-                  {label}
-                  <input
-                    className="input mt-2"
-                    name={key}
-                    defaultValue={String(
-                      editing?.[key] ?? (key === "country" ? "MEX" : ""),
-                    )}
-                    required={[
-                      "rfc",
-                      "legalName",
-                      "fiscalRegime",
-                      "email",
-                      "postalCode",
-                      "country",
-                    ].includes(key)}
-                    type={key === "email" ? "email" : "text"}
-                    maxLength={key === "notes" ? 2000 : 254}
-                  />
-                </label>
-              ))}
-              <label className="text-sm text-zinc-400">
-                Tipo de persona
-                <select
-                  name="personType"
-                  className="input mt-2"
-                  defaultValue={String(editing?.personType ?? "COMPANY")}
-                >
-                  <option value="COMPANY">Persona moral</option>
-                  <option value="INDIVIDUAL">Persona física</option>
-                </select>
-              </label>
-              <label className="text-sm text-zinc-400">
-                Uso CFDI
-                <select
-                  name="cfdiUse"
-                  className="input mt-2"
-                  defaultValue={String(editing?.cfdiUse ?? "G03")}
-                >
-                  {cfdiUses.map(([code, label]) => (
-                    <option key={code} value={code}>
-                      {code} · {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm text-zinc-400">
-                Forma de pago predeterminada
-                <select
-                  name="defaultPaymentForm"
-                  className="input mt-2"
-                  defaultValue={String(editing?.defaultPaymentForm ?? "99")}
-                >
-                  {paymentForms.map(([code, label]) => (
-                    <option key={code} value={code}>
-                      {code} · {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm text-zinc-400">
-                Correos adicionales (separados por coma)
-                <input
-                  name="additionalEmails"
-                  className="input mt-2"
-                  defaultValue={
-                    Array.isArray(editing?.additionalEmails)
-                      ? editing.additionalEmails.join(", ")
-                      : ""
-                  }
-                />
-              </label>
-            </div>
-            <div className="mt-5 flex gap-3">
-              <Button type="submit">Guardar cliente</Button>
-              <Button variant="secondary" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </fieldset>
-        </form>
+        />
       )}
-      <p role="status" className="text-sm text-violet-300">
-        {message}
-      </p>
+      {message && (
+        <p
+          role={failed ? "alert" : "status"}
+          className={failed ? "fiscal-error" : "text-sm text-violet-300"}
+        >
+          {message}
+        </p>
+      )}
       <div
         className="surface overflow-x-auto"
         tabIndex={0}
@@ -183,9 +77,11 @@ export function ClientEditor({ clients }: { clients: ClientData[] }) {
         <table className="w-full">
           <thead>
             <tr>
-              {["Nombre", "RFC", "Correo", "Estado", "Acciones"].map((h) => (
-                <th key={h}>{h}</th>
-              ))}
+              {["Nombre", "RFC", "Correo", "Estado", "Acciones"].map(
+                (heading) => (
+                  <th key={heading}>{heading}</th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody>
@@ -200,10 +96,12 @@ export function ClientEditor({ clients }: { clients: ClientData[] }) {
                     <div className="flex gap-2">
                       <button
                         className="p-2 text-violet-300 underline"
-                        onClick={() => {
+                        onClick={(event) => {
+                          opener.current = event.currentTarget;
                           setEditing(client);
                           setOpen(true);
                           setMessage("");
+                          setFailed(false);
                         }}
                       >
                         Editar
@@ -219,9 +117,11 @@ export function ClientEditor({ clients }: { clients: ClientData[] }) {
                           )
                             return;
                           setBusy(true);
+                          setMessage("");
+                          setFailed(false);
                           try {
                             const response = await fetch(
-                              "/api/clients/" + client.id,
+                              "/api/clients/" + encodeURIComponent(client.id),
                               { method: "DELETE" },
                             );
                             if (!response.ok) throw new Error();
@@ -230,7 +130,8 @@ export function ClientEditor({ clients }: { clients: ClientData[] }) {
                             );
                             router.refresh();
                           } catch {
-                            setMessage("No se pudo archivar.");
+                            setFailed(true);
+                            setMessage("⚠ No se pudo archivar.");
                           } finally {
                             setBusy(false);
                           }

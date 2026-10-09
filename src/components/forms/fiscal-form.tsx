@@ -2,68 +2,186 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { cfdiUses, addressFields } from "@/lib/fiscal-catalogs";
-import { PrivateAsset } from "./private-asset";
+import { addressFields } from "@/lib/fiscal-catalogs";
+import type {
+  FiscalConfirmation as Confirmation,
+  FiscalExtractionResult,
+  FiscalFieldComparison,
+} from "@/types/fiscal-identity";
+import type { InvoiceFiscalCatalogs } from "@/types/invoice-studio";
+import { CsfPrefill } from "@/components/fiscal/csf-prefill";
+import {
+  issuerCsfTransport,
+  type CsfTransport,
+} from "@/components/fiscal/transport";
+import { FiscalConfirmation } from "@/components/fiscal/fiscal-confirmation";
+import { FiscalCatalogFields } from "@/components/fiscal/fiscal-catalog-fields";
+import { FiscalExtractionReview } from "@/components/fiscal/fiscal-extraction-review";
+import {
+  FiscalDataComparison,
+  fiscalFieldLabels,
+} from "@/components/fiscal/fiscal-data-comparison";
+
 const fields = [
   ["rfc", "RFC", "text"],
   ["legalName", "Razón social", "text"],
-  ["fiscalRegime", "Régimen fiscal (clave de 3 dígitos)", "text"],
   ["postalCode", "Código postal fiscal", "text"],
   ["email", "Correo fiscal", "email"],
 ];
 export function FiscalForm({
   initial,
+  sourceValues,
+  catalogs,
   documentId,
   readOnly = false,
+  csfTransport = issuerCsfTransport,
 }: {
   initial: Record<string, string>;
+  sourceValues?: Record<string, string> | null;
+  catalogs: Pick<InvoiceFiscalCatalogs, "fiscalRegimes" | "cfdiUses">;
   documentId?: string;
   readOnly?: boolean;
+  csfTransport?: CsfTransport;
 }) {
+  const [values, setValues] = useState<Record<string, string>>({
+    ...initial,
+    personType: initial.personType || "COMPANY",
+    country: initial.country || "MEX",
+  });
   const [csf, setCsf] = useState(initial.csfDocumentId || "");
+  const [extraction, setExtraction] = useState<FiscalExtractionResult | null>(
+    null,
+  );
+  const [selectedRegime, setSelectedRegime] = useState<string>();
+  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [documentBusy, setDocumentBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const lock = useRef(false);
   const router = useRouter();
+  const change = (field: string, value: string) => {
+    setValues((previous) => ({ ...previous, [field]: value }));
+    setConfirmed(false);
+    setMessage("");
+  };
+  const comparisons: FiscalFieldComparison[] = Object.entries(
+    sourceValues ?? {},
+  )
+    .filter(
+      ([key, value]) =>
+        Object.hasOwn(fiscalFieldLabels, key) && typeof value === "string",
+    )
+    .map(([key, value]) => ({
+      field: key as FiscalFieldComparison["field"],
+      current: initial[key] || null,
+      detected: value,
+      changed: initial[key] !== value,
+    }));
   return (
     <form
-      className="surface p-6"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (lock.current || readOnly) return;
+      className="fiscal-ui surface p-6"
+      aria-busy={busy}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (lock.current || readOnly || documentBusy || !confirmed) return;
+        if (!values.fiscalRegime || !values.cfdiUse) {
+          setFailed(true);
+          setMessage(
+            "Selecciona el régimen fiscal y el Uso CFDI en sus catálogos.",
+          );
+          return;
+        }
         lock.current = true;
         setBusy(true);
         setMessage("");
-        const values = Object.fromEntries(new FormData(e.currentTarget));
+        setFailed(false);
         try {
-          const res = await fetch("/api/fiscal-profile", {
+          const confirmation: Confirmation = {
+            confirmed: true,
+            ...(extraction ? { extractionId: extraction.id } : {}),
+          };
+          const response = await fetch("/api/fiscal-profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...values,
-              confirmed: values.confirmed === "on",
+              ...confirmation,
               documentId,
               csfDocumentId: csf || undefined,
             }),
           });
-          const data = await res.json();
-          if (!res.ok)
-            throw new Error(
-              data.fields
-                ? Object.values(data.fields).flat().join(" ")
-                : data.error,
+          const data = await response.json();
+          if (!response.ok) {
+            setFailed(true);
+            setMessage(
+              typeof data.error === "string"
+                ? data.error
+                : "No pudimos guardar el perfil. Revisa los campos indicados.",
             );
-          setMessage("Perfil fiscal confirmado y guardado.");
+            return;
+          }
+          setMessage("✓ Información guardada correctamente");
+          setConfirmed(false);
           router.refresh();
-        } catch (e) {
-          setMessage((e as Error).message);
+        } catch {
+          setFailed(true);
+          setMessage(
+            "No pudimos guardar el perfil fiscal. Inténtalo nuevamente.",
+          );
         } finally {
           lock.current = false;
           setBusy(false);
         }
       }}
     >
-      <fieldset disabled={readOnly || busy}>
+      <CsfPrefill
+        purpose="FISCAL_PROFILE_PREFILL"
+        documentId={csf}
+        transport={csfTransport}
+        disabled={readOnly || busy}
+        onBusy={setDocumentBusy}
+        onDocument={(id) => {
+          setCsf(id);
+          setConfirmed(false);
+          setMessage("");
+        }}
+        onExtraction={(result) => {
+          setExtraction(result);
+          setSelectedRegime(undefined);
+          setConfirmed(false);
+          setMessage("");
+        }}
+      />
+      {extraction && (
+        <FiscalExtractionReview
+          result={extraction}
+          selectedRegime={selectedRegime}
+          onApply={change}
+          onRegime={(code) => {
+            change("fiscalRegime", code);
+            setSelectedRegime(code);
+          }}
+          disabled={readOnly || busy || documentBusy}
+        />
+      )}
+      {!!comparisons.length && (
+        <div className="mb-6">
+          <p className="fiscal-help">
+            Información del receptor del XML cargado. Compárala con tu perfil;
+            no se incorpora automáticamente.
+          </p>
+          <FiscalDataComparison
+            comparisons={comparisons}
+            onApply={change}
+            disabled={readOnly || busy || documentBusy}
+          />
+        </div>
+      )}
+      <fieldset disabled={readOnly || busy || documentBusy}>
+        <legend className="mb-5 font-medium">
+          2. Datos fiscales · revisa y completa
+        </legend>
         <div className="grid gap-5 md:grid-cols-2">
           {fields.map(([name, label, type]) => (
             <label key={name} className="text-sm text-zinc-400">
@@ -72,7 +190,8 @@ export function FiscalForm({
                 name={name}
                 type={type}
                 className="input mt-2"
-                defaultValue={initial[name] || ""}
+                value={values[name] || ""}
+                onChange={(event) => change(name, event.target.value)}
                 required
                 maxLength={
                   name === "legalName" ? 200 : name === "email" ? 254 : 20
@@ -85,26 +204,25 @@ export function FiscalForm({
             <select
               name="personType"
               className="input mt-2"
-              defaultValue={initial.personType || "COMPANY"}
+              value={values.personType}
+              onChange={(event) => change("personType", event.target.value)}
             >
               <option value="INDIVIDUAL">Persona física</option>
               <option value="COMPANY">Persona moral</option>
             </select>
           </label>
-          <label className="text-sm text-zinc-400">
-            Uso CFDI predeterminado
-            <select
-              name="cfdiUse"
-              className="input mt-2"
-              defaultValue={initial.cfdiUse || "G03"}
-            >
-              {cfdiUses.map(([code, label]) => (
-                <option key={code} value={code}>
-                  {code} · {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FiscalCatalogFields
+            catalogs={catalogs}
+            issuer
+            regime={values.fiscalRegime || ""}
+            cfdiUse={values.cfdiUse || ""}
+            onRegime={(code) => {
+              change("fiscalRegime", code);
+              setSelectedRegime(code);
+            }}
+            onUse={(code) => change("cfdiUse", code)}
+            disabled={readOnly || busy || documentBusy}
+          />
           {addressFields.map(([name, label]) => (
             <label key={name} className="text-sm text-zinc-400">
               {label}
@@ -112,50 +230,49 @@ export function FiscalForm({
                 name={name}
                 className="input mt-2"
                 maxLength={200}
-                defaultValue={
-                  initial[name] || (name === "country" ? "MEX" : "")
-                }
+                value={values[name] || ""}
+                onChange={(event) => change(name, event.target.value)}
               />
             </label>
           ))}
         </div>
-        <div className="mt-6">
-          <PrivateAsset
-            kind="CSF"
-            value={csf}
-            onChange={setCsf}
-            disabled={readOnly || busy}
-          />
-          <p className="mt-2 text-xs text-zinc-400">
-            La dirección completa y la constancia son obligatorias para preparar
-            facturas. Puedes guardar un perfil incompleto para completarlo
-            después.
+        <p className="fiscal-help">
+          La dirección completa y la constancia son obligatorias para preparar
+          facturas en ORBIT. Puedes guardar un perfil incompleto para
+          completarlo después.
+        </p>
+        <FiscalConfirmation
+          checked={confirmed}
+          onChange={setConfirmed}
+          disabled={!!extraction?.regimes.length && !selectedRegime}
+        />
+        {!!extraction?.regimes.length && !selectedRegime && (
+          <p className="fiscal-pending">
+            Selecciona explícitamente el régimen detectado o una opción del
+            catálogo antes de confirmar.
           </p>
-        </div>
-        <label className="mt-6 flex items-start gap-3 text-sm text-zinc-400">
-          <input
-            type="checkbox"
-            name="confirmed"
-            required
-            className="mt-1 accent-violet-500"
-          />
-          Revisé y confirmo los datos fiscales de esta organización.
-        </label>
-        <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-          {!readOnly && (
-            <Button type="submit" disabled={busy}>
+        )}
+        {!readOnly && (
+          <div className="mt-6 flex justify-end">
+            <Button type="submit" disabled={busy || documentBusy || !confirmed}>
               {busy ? "Guardando…" : "Confirmar y guardar perfil"}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </fieldset>
       {readOnly && (
-        <p className="mt-5 text-sm text-zinc-500">
+        <p className="fiscal-help">
           Solo propietarios y administradores pueden actualizar el perfil.
         </p>
       )}
       {message && (
-        <p role="status" className="mt-4 text-sm text-violet-300">
+        <p
+          role={failed ? "alert" : "status"}
+          className={
+            failed ? "fiscal-error mt-4" : "mt-4 text-sm text-violet-300"
+          }
+        >
+          {failed ? "⚠ " : ""}
           {message}
         </p>
       )}

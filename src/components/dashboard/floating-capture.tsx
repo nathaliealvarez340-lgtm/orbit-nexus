@@ -2,9 +2,11 @@
 import { ScanLine, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { UploadZone } from "./upload-zone";
+import { usePrivacyLayer } from "@/components/privacy/privacy-layer";
 export function FloatingCapture() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  const privacy = usePrivacyLayer();
   return (
     <>
       <button
@@ -14,6 +16,7 @@ export function FloatingCapture() {
         onClick={() => {
           setOpen(true);
           dialog.current?.showModal();
+          privacy?.setHost(dialog.current);
         }}
       >
         <ScanLine className="size-6" />
@@ -21,7 +24,10 @@ export function FloatingCapture() {
       <dialog
         ref={dialog}
         aria-labelledby="capture-title"
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          privacy?.setHost(null);
+        }}
         className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-3xl border border-white/10 bg-[#101014] p-6 text-white backdrop:bg-black/75"
       >
         <div className="mb-6 flex items-center justify-between">

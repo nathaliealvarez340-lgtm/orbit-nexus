@@ -5,10 +5,12 @@ import { PanelLeftClose } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Navigation } from "./navigation";
 import { LogoutButton } from "./logout-button";
+import { usePathname } from "next/navigation";
 
 export function Sidebar() {
-  // The dashboard layout keeps this preference while navigating in this session.
-  const [expanded, setExpanded] = useState(false);
+  const pathname = usePathname();
+  const [expandedAt, setExpandedAt] = useState<string | null>(null);
+  const expanded = expandedAt === pathname;
   const [hint, setHint] = useState<{
     label: string;
     x: number;
@@ -17,6 +19,20 @@ export function Sidebar() {
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panel = useRef<HTMLElement>(null);
   const hintOpen = hint !== null;
+  useEffect(() => {
+    if (!expanded) return;
+    const dismiss = (event: MouseEvent) => {
+      if (
+        event.target instanceof Node &&
+        !panel.current?.contains(event.target)
+      ) {
+        setExpandedAt(null);
+        setHint(null);
+      }
+    };
+    document.addEventListener("click", dismiss);
+    return () => document.removeEventListener("click", dismiss);
+  }, [expanded]);
   useEffect(() => {
     if (!hintOpen) return;
     const dismiss = (event: KeyboardEvent) => {
@@ -81,7 +97,7 @@ export function Sidebar() {
               aria-label="Contraer menú"
               className="orbit-sidebar-collapse"
               onClick={() => {
-                setExpanded(false);
+                setExpandedAt(null);
                 requestAnimationFrame(() =>
                   panel.current
                     ?.querySelector<HTMLElement>(
@@ -98,7 +114,19 @@ export function Sidebar() {
         <div className="orbit-sidebar-scroll">
           <Navigation
             collapsed={!expanded}
-            onExpand={() => setExpanded(true)}
+            onExpand={() => setExpandedAt(pathname)}
+            onNavigate={() => {
+              // A child link will disappear on collapse. Preserve keyboard focus
+              // on its module control when navigating to the current route.
+              const active = document.activeElement as HTMLElement | null;
+              const moduleControl = active
+                ?.closest("li")
+                ?.parentElement?.closest("li")
+                ?.querySelector<HTMLElement>(".orbit-nav-item");
+              setExpandedAt(null);
+              if (active?.classList.contains("orbit-nav-child"))
+                moduleControl?.focus();
+            }}
           />
         </div>
         <div className="orbit-sidebar-footer">
