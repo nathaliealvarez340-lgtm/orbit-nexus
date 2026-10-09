@@ -1,0 +1,182 @@
+{
+  "catalogVersion": "1",
+  "catalogRevision": "0",
+  "publishedOn": null,
+  "validFrom": "2022-01-01",
+  "validTo": null,
+  "entries": [
+    {
+      "code": "601",
+      "description": "General de Ley Personas Morales",
+      "personTypes": [
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "603",
+      "description": "Personas Morales con Fines no Lucrativos",
+      "personTypes": [
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "605",
+      "description": "Sueldos y Salarios e Ingresos Asimilados a Salarios",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "606",
+      "description": "Arrendamiento",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "607",
+      "description": "Régimen de Enajenación o Adquisición de Bienes",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "608",
+      "description": "Demás ingresos",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "610",
+      "description": "Residentes en el Extranjero sin Establecimiento Permanente en México",
+      "personTypes": [
+        "INDIVIDUAL",
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "611",
+      "description": "Ingresos por Dividendos (socios y accionistas)",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "612",
+      "description": "Personas Físicas con Actividades Empresariales y Profesionales",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "614",
+      "description": "Ingresos por intereses",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "615",
+      "description": "Régimen de los ingresos por obtención de premios",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "616",
+      "description": "Sin obligaciones fiscales",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "620",
+      "description": "Sociedades Cooperativas de Producción que optan por diferir sus ingresos",
+      "personTypes": [
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "621",
+      "description": "Incorporación Fiscal",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "622",
+      "description": "Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras",
+      "personTypes": [
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "623",
+      "description": "Opcional para Grupos de Sociedades",
+      "personTypes": [
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "624",
+      "description": "Coordinados",
+      "personTypes": [
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "625",
+      "description": "Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas",
+      "personTypes": [
+        "INDIVIDUAL"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "626",
+      "description": "Régimen Simplificado de Confianza",
+      "personTypes": [
+        "INDIVIDUAL",
+        "COMPANY"
+      ],
+      "validFrom": "2022-01-01",
+      "validTo": null
+    }
+  ]
+}

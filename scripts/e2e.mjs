@@ -409,7 +409,7 @@ try {
     legalName: "Usuario de prueba",
     fiscalRegime: "616",
     postalCode: "06600",
-    cfdiUse: "G03",
+    cfdiUse: "S01",
     email: "fiscal@example.test",
     personType: "INDIVIDUAL",
     confirmed: true,

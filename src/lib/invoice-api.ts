@@ -20,6 +20,16 @@ export class InvoiceApiError extends ApiError {
   }
 }
 
+/** Coded errors for non-invoice routes (fiscal identity); other errors use apiError. */
+export function codedApiError(error: unknown) {
+  if (error instanceof InvoiceApiError)
+    return Response.json(
+      { error: error.message, code: error.code },
+      { status: error.status },
+    );
+  return apiError(error);
+}
+
 export function invoiceApiError(error: unknown) {
   if (error instanceof InvoiceApiError)
     return Response.json(

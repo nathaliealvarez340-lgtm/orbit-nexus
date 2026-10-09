@@ -28,6 +28,7 @@ import {
   vatRates,
 } from "@/lib/sat-catalogs";
 import { largeCatalogSources } from "@/lib/sat-catalogs-large";
+import { postalCodeIndex } from "@/lib/sat/postal-codes";
 import type {
   Client,
   FiscalProfile,
@@ -242,7 +243,9 @@ type DraftRefs = {
   client: Client | null;
   inactiveSaved: Set<string>;
   missingSaved: Set<string>;
+  postalCodes: PostalCodeLookup;
 };
+type PostalCodeLookup = { has(code: string): boolean };
 async function loadDraftRefs(
   db: Db,
   organizationId: string,
@@ -274,6 +277,7 @@ async function loadDraftRefs(
     client,
     inactiveSaved: new Set(saved.filter((s) => !s.active).map((s) => s.id)),
     missingSaved: new Set(savedIds.filter((id) => !found.has(id))),
+    postalCodes: await postalCodeIndex(),
   };
 }
 
@@ -283,6 +287,7 @@ function evaluate(
   receiver: (RuleParty & { available?: boolean }) | null,
   totals: CalculatedInvoiceTotals,
   inactiveSaved: ReadonlySet<string>,
+  postalCodes: PostalCodeLookup,
   extra: InvoiceValidationIssue[] = [],
 ): InvoiceValidationResult {
   return buildValidationResult(
@@ -295,6 +300,7 @@ function evaluate(
         today: mexicoToday(),
         isKnownProductCode: largeCatalogSources["product-services"].has,
         isKnownUnitCode: largeCatalogSources.units.has,
+        isKnownPostalCode: (code) => postalCodes.has(code),
         inactiveSavedConceptIds: inactiveSaved,
       }),
       ...extra,
@@ -319,6 +325,7 @@ function evaluateDraft(
     refs.client ? partyFacts(receiverSnapshot(refs.client)) : null,
     totals,
     refs.inactiveSaved,
+    refs.postalCodes,
     extra,
   );
 }
@@ -524,6 +531,7 @@ async function validateStoredInvoice(
       : null,
     calculateInvoiceTotals(parsed.data.concepts),
     new Set(inactive.map((s) => s.id)),
+    await postalCodeIndex(),
     extra,
   );
 }
@@ -760,6 +768,51 @@ export async function createInvoiceDraft(
   });
 }
 
+/**
+ * Contract §11.3: when relevant fiscal master data changes, READY invoices that depend on
+ * it go back to DRAFT (new version) and must be revalidated. Snapshots are not rewritten.
+ */
+export async function revertReadyInvoices(
+  tx: Db,
+  scope: {
+    organizationId: string;
+    userId: string;
+    clientId?: string;
+    reason: "FISCAL_PROFILE_UPDATED" | "CLIENT_UPDATED" | "CLIENT_ARCHIVED";
+  },
+) {
+  const where = {
+    organizationId: scope.organizationId,
+    status: "READY" as const,
+    ...(scope.clientId ? { clientId: scope.clientId } : {}),
+  };
+  const ready = await tx.stampedInvoice.findMany({
+    where,
+    select: { id: true },
+  });
+  if (!ready.length) return 0;
+  await tx.stampedInvoice.updateMany({
+    where: { ...where, id: { in: ready.map((r) => r.id) } },
+    data: {
+      status: "DRAFT",
+      readyAt: null,
+      version: { increment: 1 },
+      updatedAt: new Date(),
+    },
+  });
+  await tx.activityLog.createMany({
+    data: ready.map((r) => ({
+      organizationId: scope.organizationId,
+      userId: scope.userId,
+      action: "INVOICE_REVERTED_TO_DRAFT",
+      entityType: "StampedInvoice",
+      entityId: r.id,
+      metadata: { reason: scope.reason },
+    })),
+  });
+  return ready.length;
+}
+
 const draftConflict = () =>
   new InvoiceApiError(
     409,
@@ -831,6 +884,7 @@ export async function updateInvoiceDraft(
         ...(settings ? { templateSnapshot: templateSnapshot(settings) } : {}),
         status: "DRAFT",
         readyAt: null,
+        version: { increment: 1 },
         updatedAt: new Date(),
       },
     });
@@ -982,6 +1036,7 @@ export async function getInvoiceDraftDetail(
     subtotal: totals.subtotal,
     tax: totals.transferredTaxes,
     total: totals.total,
+    version: invoice.version,
   };
 }
 

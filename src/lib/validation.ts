@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cfdiUses } from "./fiscal-catalogs";
+import { cfdiUseProblem, fiscalRegimeProblem } from "./fiscal-identity-rules";
 import { normalizeBillingUrl } from "./billing-url";
 
 export const passwordSchema = z
@@ -99,4 +100,20 @@ export const fiscalSchema = z
   .refine((v) => v.rfc.length === (v.personType === "INDIVIDUAL" ? 13 : 12), {
     path: ["rfc"],
     message: "El RFC no coincide con el tipo de persona",
+  })
+  // Fase 5C §7: régimen and Uso CFDI are validated against the official SAT catalogs.
+  .superRefine((v, ctx) => {
+    const regime = fiscalRegimeProblem(v.fiscalRegime, v.personType, v.rfc);
+    if (regime)
+      ctx.addIssue({ code: "custom", path: ["fiscalRegime"], message: regime });
+    else {
+      const use = cfdiUseProblem(
+        v.cfdiUse,
+        v.fiscalRegime,
+        v.personType,
+        v.rfc,
+      );
+      if (use)
+        ctx.addIssue({ code: "custom", path: ["cfdiUse"], message: use });
+    }
   });

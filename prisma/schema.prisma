@@ -65,6 +65,8 @@ model Organization {
   billingProviders OrganizationBillingProvider[]
   billingAttempts BillingAttempt[]
   savedInvoiceConcepts SavedInvoiceConcept[]
+  fiscalConsents  FiscalDocumentConsent[]
+  fiscalExtractions FiscalDocumentExtraction[]
 }
 
 model Membership {
@@ -160,6 +162,9 @@ model Document {
   invoiceSettings InvoiceSettings[]        @relation("InvoiceLogo")
   outgoingXml     StampedInvoice[]         @relation("OutgoingXml")
   outgoingPdf     StampedInvoice[]         @relation("OutgoingPdf")
+  csfClients      Client[]                 @relation("ClientCsf")
+  fiscalConsents  FiscalDocumentConsent[]
+  fiscalExtractions FiscalDocumentExtraction[]
 
   @@unique([organizationId, id])
   @@index([organizationId, createdAt])
@@ -252,6 +257,10 @@ model FiscalProfile {
   csfDocumentId  String?
   csfDocument    Document?    @relation("FiscalCsf", fields: [organizationId, csfDocumentId], references: [organizationId, id])
   confirmedAt    DateTime?
+  // Fase 5C provenance: who confirmed the data and which reviewed extraction it came from.
+  confirmedById      String?
+  sourceExtractionId String?
+  sourceExtraction   FiscalDocumentExtraction? @relation("FiscalProfileSource", fields: [organizationId, sourceExtractionId], references: [organizationId, id], onDelete: Restrict)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -420,6 +429,8 @@ model StampedInvoice {
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   uuid             String?                 @unique
   status           InvoiceStatus           @default(DRAFT)
+  // Fase 5C: incremented on every fiscal change or READY → DRAFT revert.
+  version          Int                     @default(1)
   clientId         String?
   client           Client?                 @relation(fields: [organizationId, clientId], references: [organizationId, id])
   folio            String?
@@ -574,12 +585,79 @@ model Client {
   country            String           @default("MEX")
   reference          String?
   archivedAt         DateTime?
+  // Fase 5C: optional client CSF and provenance of reviewed, confirmed data.
+  csfDocumentId      String?
+  csfDocument        Document?        @relation("ClientCsf", fields: [organizationId, csfDocumentId], references: [organizationId, id], onDelete: Restrict)
+  sourceExtractionId String?
+  sourceExtraction   FiscalDocumentExtraction? @relation("ClientSource", fields: [organizationId, sourceExtractionId], references: [organizationId, id], onDelete: Restrict)
+  confirmedAt        DateTime?
+  confirmedById      String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   invoices           StampedInvoice[]
+  fiscalConsents     FiscalDocumentConsent[]
 
   @@unique([organizationId, id])
   @@index([organizationId, archivedAt])
+}
+
+enum FiscalConsentPurpose {
+  FISCAL_PROFILE_PREFILL
+  CLIENT_FISCAL_PREFILL
+}
+
+enum FiscalExtractionStatus {
+  PROCESSED
+  PARTIAL
+  UNREADABLE
+}
+
+// Fase 5C §9.2: evidence of an explicit, versioned authorization to read a fiscal
+// document. Never stores document contents or secrets.
+model FiscalDocumentConsent {
+  id                   String                     @id @default(cuid())
+  organizationId       String
+  organization         Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId               String
+  documentId           String
+  document             Document                   @relation(fields: [organizationId, documentId], references: [organizationId, id], onDelete: Restrict)
+  purpose              FiscalConsentPurpose
+  clientId             String?
+  client               Client?                    @relation(fields: [organizationId, clientId], references: [organizationId, id], onDelete: Restrict)
+  consentVersion       String
+  privacyNoticeVersion String?
+  acceptedAt           DateTime                   @default(now())
+  extractions          FiscalDocumentExtraction[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, documentId])
+}
+
+// Fase 5C §8.7: detected data, kept apart from the original document and from the
+// confirmed fiscal data. Never used directly for stamping.
+model FiscalDocumentExtraction {
+  id             String                 @id @default(cuid())
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  consentId      String
+  consent        FiscalDocumentConsent  @relation(fields: [organizationId, consentId], references: [organizationId, id], onDelete: Restrict)
+  documentId     String
+  document       Document               @relation(fields: [organizationId, documentId], references: [organizationId, id], onDelete: Restrict)
+  purpose        FiscalConsentPurpose
+  clientId       String?
+  createdById    String
+  status         FiscalExtractionStatus
+  parserVersion  String
+  fields         Json
+  regimes        Json
+  message        String?
+  createdAt      DateTime               @default(now())
+  profiles       FiscalProfile[]        @relation("FiscalProfileSource")
+  clients        Client[]               @relation("ClientSource")
+
+  @@unique([organizationId, id])
+  @@index([organizationId, documentId, createdAt])
+  @@index([organizationId, consentId])
 }
 
 model InvoiceSettings {

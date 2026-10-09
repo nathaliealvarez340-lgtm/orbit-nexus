@@ -17,12 +17,20 @@ import {
   exportCodeCatalog,
   genericProductCode,
   genericRfc,
+  inForce,
   maxWithholdingIsrRate,
   maxWithholdingVatRate,
+  officialCfdiUses,
+  officialRegimes,
   regimePersonTypes,
   taxObjectCatalog,
   vatRates,
 } from "./sat-catalogs";
+
+const regimeInForce = (code: string, date: string) => {
+  const entry = officialRegimes.get(code);
+  return !entry || inForce(entry, date);
+};
 
 export type RuleParty = {
   rfc: string;
@@ -44,6 +52,8 @@ export type InvoiceRuleInput = {
   /** Large-catalog lookups. The server always provides them; unknown codes block READY. */
   isKnownProductCode?: (code: string) => boolean;
   isKnownUnitCode?: (code: string) => boolean;
+  /** Official c_CodigoPostal lookup (server-only); unknown postal codes block READY. */
+  isKnownPostalCode?: (code: string) => boolean;
   inactiveSavedConceptIds?: ReadonlySet<string>;
 };
 
@@ -186,11 +196,28 @@ export function validateInvoiceRules(
         `El régimen fiscal del emisor no aplica a una ${personLabel(issuer.personType)}.`,
         { field: "fiscalRegime" },
       );
+    else if (!regimeInForce(issuer.fiscalRegime, draft.invoiceDate))
+      error(
+        "issuer",
+        "ISSUER_REGIME_NOT_IN_FORCE",
+        "El régimen fiscal del emisor no está vigente en el catálogo del SAT para la fecha de la factura.",
+        { field: "fiscalRegime" },
+      );
     if (!/^\d{5}$/.test(issuer.postalCode))
       error(
         "issuer",
         "ISSUER_POSTAL_CODE_INVALID",
         "El emisor necesita un código postal fiscal de 5 dígitos (lugar de expedición).",
+        { field: "postalCode" },
+      );
+    else if (
+      input.isKnownPostalCode &&
+      !input.isKnownPostalCode(issuer.postalCode)
+    )
+      error(
+        "issuer",
+        "ISSUER_POSTAL_CODE_UNVERIFIED",
+        `El código postal ${issuer.postalCode} del emisor no existe en el catálogo del SAT.`,
         { field: "postalCode" },
       );
   }
@@ -250,11 +277,28 @@ export function validateInvoiceRules(
         `El régimen fiscal del receptor no aplica a una ${personLabel(receiver.personType)}.`,
         { field: "fiscalRegime" },
       );
+    else if (!regimeInForce(receiver.fiscalRegime, draft.invoiceDate))
+      error(
+        "receiver",
+        "RECEIVER_REGIME_NOT_IN_FORCE",
+        "El régimen fiscal del receptor no está vigente en el catálogo del SAT para la fecha de la factura.",
+        { field: "fiscalRegime" },
+      );
     if (!/^\d{5}$/.test(receiver.postalCode))
       error(
         "receiver",
         "RECEIVER_POSTAL_CODE_REQUIRED",
         "El receptor necesita un código postal fiscal.",
+        { field: "postalCode" },
+      );
+    else if (
+      input.isKnownPostalCode &&
+      !input.isKnownPostalCode(receiver.postalCode)
+    )
+      error(
+        "receiver",
+        "RECEIVER_POSTAL_CODE_UNVERIFIED",
+        `El código postal ${receiver.postalCode} del receptor no existe en el catálogo del SAT.`,
         { field: "postalCode" },
       );
     if (issuer && issuer.rfc === receiver.rfc)
@@ -320,7 +364,15 @@ export function validateInvoiceRules(
         );
     }
     const use = cfdiUseRules.get(draft.cfdiUse);
-    if (!catalogOption(cfdiUseCatalog, draft.cfdiUse)?.active)
+    const officialUse = officialCfdiUses.get(draft.cfdiUse);
+    if (officialUse && !inForce(officialUse, draft.invoiceDate))
+      error(
+        "receiver",
+        "CFDI_USE_NOT_IN_FORCE",
+        "El Uso CFDI no está vigente en el catálogo del SAT para la fecha de la factura.",
+        { field: "cfdiUse" },
+      );
+    else if (!catalogOption(cfdiUseCatalog, draft.cfdiUse)?.active)
       error(
         "receiver",
         "CFDI_USE_NOT_SUPPORTED",

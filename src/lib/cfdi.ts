@@ -58,6 +58,11 @@ function readRoot(xml: string) {
   return root;
 }
 
+/** Structural check only (CFDI 4.0 root and namespace); reads no party data (Fase 5C D11). */
+export function assertCfdi40Document(xml: string) {
+  readRoot(xml);
+}
+
 export function readCfdiReceiver(xml: string) {
   const root = readRoot(xml);
   const { node } = element(

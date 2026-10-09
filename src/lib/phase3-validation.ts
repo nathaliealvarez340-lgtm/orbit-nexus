@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { cfdiUses, paymentForms } from "./fiscal-catalogs";
 import { canonicalRate, catalogCodes, vatRates } from "./sat-catalogs";
+import { cfdiUseProblem, fiscalRegimeProblem } from "./fiscal-identity-rules";
 import { dateSchema } from "./validation";
 const text = z.string().trim().max(200).default("");
 export const cfdiUseSchema = z
@@ -49,6 +50,9 @@ export const clientSchema = z
     postalCode: z.string().regex(/^\d{5}$/),
     ...addressShape,
     reference: text,
+    // Fase 5C §10.9: required only when saving reviewed data from an extraction.
+    confirmed: z.literal(true).optional(),
+    extractionId: z.string().trim().min(1).max(100).optional(),
   })
   .refine(
     (v) =>
@@ -56,7 +60,27 @@ export const clientSchema = z
       v.rfc === "XAXX010101000" ||
       v.rfc.length === (v.personType === "INDIVIDUAL" ? 13 : 12),
     { path: ["rfc"], message: "RFC y tipo de persona incompatibles" },
-  );
+  )
+  .refine((v) => !v.extractionId || v.confirmed === true, {
+    path: ["confirmed"],
+    message: "Confirma que revisaste los datos fiscales del cliente",
+  })
+  // Fase 5C §10.2/§10.6: official régimen catalog and Uso CFDI compatibility.
+  .superRefine((v, ctx) => {
+    const regime = fiscalRegimeProblem(v.fiscalRegime, v.personType, v.rfc);
+    if (regime)
+      ctx.addIssue({ code: "custom", path: ["fiscalRegime"], message: regime });
+    else {
+      const use = cfdiUseProblem(
+        v.cfdiUse,
+        v.fiscalRegime,
+        v.personType,
+        v.rfc,
+      );
+      if (use)
+        ctx.addIssue({ code: "custom", path: ["cfdiUse"], message: use });
+    }
+  });
 // Fase 5 structural draft contract (src/types/invoice-studio.ts §14-15). Fiscal
 // combinations live in invoice-rules.ts so a draft with fiscal errors can still be
 // saved as DRAFT (contract §7). Codes that are persisted must exist in the catalog.

@@ -4,9 +4,20 @@ import { requireTenant, requireAdmin } from "@/lib/tenant";
 import { ApiError, enforceRateLimit } from "@/lib/http";
 import { fiscalSchema } from "@/lib/validation";
 import { validateUpload, UploadValidationError } from "@/lib/upload-validation";
-import { readCfdiReceiver } from "@/lib/cfdi";
+import { assertCfdi40Document } from "@/lib/cfdi";
 import { z } from "zod";
 import { addressShape } from "@/lib/phase3-validation";
+import { revertReadyInvoices } from "./outgoing-invoices";
+
+// Issuer data copied into invoice snapshots; changing any of them invalidates READY.
+const issuerFiscalFields = [
+  "rfc",
+  "legalName",
+  "personType",
+  "fiscalRegime",
+  "postalCode",
+] as const;
+
 export async function getFiscalProfile() {
   const { organizationId } = await requireTenant();
   return getDb().fiscalProfile.findFirst({ where: { organizationId } });
@@ -17,11 +28,17 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
   await enforceRateLimit("fiscal:" + userId, 20, 60);
   const { confirmed, ...data } = fiscalSchema.parse(input);
   const extended = z
-    .object({ ...addressShape, csfDocumentId: z.string().max(100).optional() })
+    .object({
+      ...addressShape,
+      csfDocumentId: z.string().max(100).optional(),
+      // Fase 5C §8.7: reviewed extraction the confirmed data came from.
+      extractionId: z.string().min(1).max(100).optional(),
+    })
     .parse(input);
-  const { csfDocumentId, ...address } = extended;
+  const { csfDocumentId: requestedCsf, extractionId, ...address } = extended;
   void confirmed;
   return getDb().$transaction(async (tx) => {
+    let csfDocumentId = requestedCsf;
     if (
       csfDocumentId &&
       !(await tx.document.findFirst({
@@ -34,6 +51,27 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
       }))
     )
       throw new ApiError(404, "Constancia no disponible para esta empresa.");
+    if (extractionId) {
+      const extraction = await tx.fiscalDocumentExtraction.findFirst({
+        where: {
+          id: extractionId,
+          organizationId,
+          purpose: "FISCAL_PROFILE_PREFILL",
+        },
+        select: {
+          documentId: true,
+          document: { select: { kind: true, mimeType: true } },
+        },
+      });
+      if (!extraction)
+        throw new ApiError(404, "Extracción no disponible para esta empresa.");
+      if (
+        !csfDocumentId &&
+        extraction.document.kind === "CSF" &&
+        extraction.document.mimeType === "application/pdf"
+      )
+        csfDocumentId = extraction.documentId;
+    }
     if (
       documentId &&
       !(await tx.uploadedFiscalDocument.findFirst({
@@ -41,22 +79,19 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
       }))
     )
       throw new ApiError(404, "Documento no disponible.");
+    const previous = await tx.fiscalProfile.findUnique({
+      where: { organizationId },
+    });
+    const provenance = {
+      confirmedAt: new Date(),
+      confirmedById: userId,
+      ...(extractionId ? { sourceExtractionId: extractionId } : {}),
+      ...(csfDocumentId ? { csfDocumentId } : {}),
+    };
     const result = await tx.fiscalProfile.upsert({
       where: { organizationId },
-      create: {
-        ...data,
-        ...address,
-        ...(csfDocumentId ? { csfDocumentId } : {}),
-        organizationId,
-        userId,
-        confirmedAt: new Date(),
-      },
-      update: {
-        ...data,
-        ...address,
-        ...(csfDocumentId ? { csfDocumentId } : {}),
-        confirmedAt: new Date(),
-      },
+      create: { ...data, ...address, ...provenance, organizationId, userId },
+      update: { ...data, ...address, ...provenance },
     });
     if (documentId)
       await tx.uploadedFiscalDocument.updateMany({
@@ -72,6 +107,16 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
         entityId: result.id,
       },
     });
+    // Contract §11.3: a READY invoice whose issuer data changed must be revalidated.
+    if (
+      previous &&
+      issuerFiscalFields.some((key) => previous[key] !== result[key])
+    )
+      await revertReadyInvoices(tx, {
+        organizationId,
+        userId,
+        reason: "FISCAL_PROFILE_UPDATED",
+      });
     return { ok: true };
   });
 }
@@ -88,32 +133,16 @@ export async function uploadFiscalDocument(file: File) {
       (e as Error).message,
     );
   }
-  let extractedData: Record<string, string> = {};
+  // Fase 5C D11: storing a document never extracts its data. Party data is read only
+  // after explicit consent, through /api/fiscal-consents and /api/fiscal-extractions.
   if (data.mimeType === "application/xml") {
     if (data.size > 1024 * 1024)
       throw new ApiError(400, "El XML fiscal debe ser menor a 1 MB.");
-    const xml = data.content.toString("utf8");
-    let receiver;
     try {
-      receiver = readCfdiReceiver(xml);
+      assertCfdi40Document(data.content.toString("utf8"));
     } catch {
-      throw new ApiError(
-        400,
-        "No se encontraron datos válidos del receptor en este CFDI 4.0.",
-      );
+      throw new ApiError(400, "El archivo no es un CFDI 4.0 válido.");
     }
-    extractedData = Object.fromEntries(
-      Object.entries({
-        rfc: receiver.Rfc,
-        legalName: receiver.Nombre,
-        postalCode: receiver.DomicilioFiscalReceptor,
-        fiscalRegime: receiver.RegimenFiscalReceptor,
-        cfdiUse: receiver.UsoCFDI,
-        personType: receiver.Rfc.length === 13 ? "INDIVIDUAL" : "COMPANY",
-      })
-        .filter(([, v]) => typeof v === "string")
-        .map(([k, v]) => [k, String(v).slice(0, 250)]),
-    );
   }
   return getDb().$transaction(async (tx) => {
     const doc = await tx.document.create({
@@ -127,7 +156,7 @@ export async function uploadFiscalDocument(file: File) {
         fileName: data.fileName,
         mimeType: data.mimeType,
         storageKey: "db:" + doc.id,
-        extractedData,
+        extractedData: {},
       },
     });
     await tx.activityLog.create({
@@ -139,6 +168,6 @@ export async function uploadFiscalDocument(file: File) {
         entityId: fiscal.id,
       },
     });
-    return { id: fiscal.id };
+    return { id: fiscal.id, documentId: doc.id };
   });
 }

@@ -594,12 +594,20 @@ test("product and unit codes outside the verified catalog block READY but never 
 test("phase 5 migration is additive, backfills legacy lines and keeps saved concepts tenant-scoped", async () => {
   const db = await PGlite.create();
   try {
-    const names = (await readdir("prisma/migrations"))
-      .filter((n) => /^\d/.test(n))
-      .sort();
+    // Explicit, stable baseline: exactly the migrations that preceded Fase 5A.
+    // New migrations never change the set this test applies.
+    const before5A = [
+      "202609200001_phase1",
+      "202609200002_multitenant",
+      "202609270001_phase3",
+      "202609300001_ticket_intelligence",
+      "202610010001_ticket_billing",
+    ];
     const phase5 = "202610070001_phase5_fiscal_foundation";
-    assert.equal(names.at(-1), phase5);
-    for (const name of names.slice(0, -1))
+    const available = new Set(await readdir("prisma/migrations"));
+    for (const name of [...before5A, phase5])
+      assert(available.has(name), name + " migration is missing");
+    for (const name of before5A)
       await db.exec(
         await readFile(`prisma/migrations/${name}/migration.sql`, "utf8"),
       );

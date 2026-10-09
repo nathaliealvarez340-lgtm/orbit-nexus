@@ -1,0 +1,94 @@
+{
+  "catalog": "catCFDI",
+  "cfdiVersion": "4.0",
+  "release": "catCFDI_V_4_20261001",
+  "sources": [
+    {
+      "name": "catCFDI_V_4_20261001.xls",
+      "url": "http://omawww.sat.gob.mx/tramitesyservicios/Paginas/documentos/catCFDI_V_4_20261001.xls",
+      "listedOn": "http://omawww.sat.gob.mx/tramitesyservicios/Paginas/anexo_20.htm",
+      "obtainedAt": "2026-10-08",
+      "bytes": 48773632,
+      "sha256": "974e9c401636ee48adfaaa0acd4a97d382c204146c201c631f9069fec0bad85b",
+      "stored": false
+    },
+    {
+      "name": "catCFDI.xsd",
+      "url": "http://www.sat.gob.mx/sitio_internet/cfd/catalogos/catCFDI.xsd",
+      "listedOn": "http://omawww.sat.gob.mx/tramitesyservicios/Paginas/anexo_20.htm",
+      "obtainedAt": "2026-10-08",
+      "bytes": 5984046,
+      "sha256": "6c58936cb77576f839a4d7915953ceaf252b9eb9319f9458fe5bb67ae2bb0bb1",
+      "stored": "resources/sat/cfdi40/catCFDI.xsd"
+    }
+  ],
+  "extraction": {
+    "method": "Microsoft Excel COM, read-only, macros force-disabled; UsedRange.Value2 exported to UTF-8 TSV",
+    "script": "scripts/sat/export-catcfdi.ps1",
+    "sheets": {
+      "c_RegimenFiscal": "52ae1ea64322887a81d8e145a684aba245a65199bff47607550f74b45dfcfe5d",
+      "c_UsoCFDI": "904574df712c35e0db5a76fc6bebb56f8deeb576d732eba6428b5e8fb5a81b9f",
+      "c_CodigoPostal_Parte_1": "4c89a7d108d09e7b4064c29012b378647a57e695f4ceeec56f938ca5abaee096",
+      "c_CodigoPostal_Parte_2": "d50e943ba8c8a59f758eb4f41afee71bc749c9b65aaf68d5524705b0c9cfd513"
+    }
+  },
+  "catalogs": {
+    "c_RegimenFiscal": {
+      "file": "c_RegimenFiscal.json",
+      "sha256": "aeab32dbb97710aae58992aed38cac15eaa4eb5ca22a0a054b794d3004c7eabe",
+      "entries": 19,
+      "catalogVersion": "1",
+      "catalogRevision": "0",
+      "publishedOn": null,
+      "complete": true,
+      "verification": {
+        "method": "every xls code is an enumeration of the official catCFDI.xsd",
+        "xlsCodes": 19,
+        "xsdCodes": 23,
+        "codesMissingFromXsd": [],
+        "xsdOnlyCodes": [
+          "609",
+          "628",
+          "629",
+          "630"
+        ]
+      }
+    },
+    "c_UsoCFDI": {
+      "file": "c_UsoCFDI.json",
+      "sha256": "9827716c959e3a3770a7106b37dbd5858e0b8d736153d44929be5651009e8364",
+      "entries": 24,
+      "catalogVersion": "2",
+      "catalogRevision": "0",
+      "publishedOn": "2023-04-22",
+      "complete": true,
+      "verification": {
+        "method": "every xls code is an enumeration of the official catCFDI.xsd",
+        "xlsCodes": 24,
+        "xsdCodes": 25,
+        "codesMissingFromXsd": [],
+        "xsdOnlyCodes": [
+          "P01"
+        ]
+      }
+    },
+    "c_CodigoPostal": {
+      "file": "c_CodigoPostal.json",
+      "sha256": "a263da9c3b0243c9bd3c1e80e41053bf2c9a9ebe670b986c84b38016532251c6",
+      "entries": 95748,
+      "catalogVersion": "1",
+      "catalogRevision": "8",
+      "publishedOn": "2026-01-22",
+      "complete": true,
+      "verification": {
+        "method": "every xls code is an enumeration of the official catCFDI.xsd",
+        "xlsCodes": 95748,
+        "xsdCodes": 95749,
+        "codesMissingFromXsd": [],
+        "xsdOnlyCodes": [
+          "00000"
+        ]
+      }
+    }
+  }
+}
