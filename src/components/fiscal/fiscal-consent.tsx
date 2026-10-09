@@ -5,14 +5,6 @@ import type {
   FiscalConsentTerms,
 } from "@/types/fiscal-identity";
 
-// Contract copy for the disabled preview while versioned terms are unavailable.
-// It is never submitted as consent evidence or assigned a fabricated version.
-const previewText: Record<FiscalConsentPurpose, string> = {
-  FISCAL_PROFILE_PREFILL:
-    "Autorizo a ORBIT NEXUS a leer esta Constancia de Situación Fiscal con la finalidad de extraer y prellenar mis datos fiscales. Podré revisar y corregir la información antes de guardarla. Esta autorización no implica la emisión de CFDI ni autoriza el uso de mi e.firma.",
-  CLIENT_FISCAL_PREFILL:
-    "Declaro que cuento con facultades o una base legítima para proporcionar y tratar esta información fiscal del cliente con la finalidad de administrar y preparar sus comprobantes fiscales en ORBIT NEXUS.",
-};
 export function FiscalConsent({
   purpose,
   terms,
@@ -37,11 +29,16 @@ export function FiscalConsent({
           onChange={(event) => onChange(event.target.checked)}
           aria-describedby={id}
         />
-        <span>{terms?.text ?? previewText[purpose]}</span>
+        <span>
+          {terms?.text ??
+            (purpose === "CLIENT_FISCAL_PREFILL"
+              ? "Declaración de tratamiento del cliente pendiente de cargar."
+              : "Autorización de lectura pendiente de cargar.")}
+        </span>
       </label>
       <p id={id} className="fiscal-help">
         La autorización corresponde únicamente a este documento y esta
-        finalidad.{" "}
+        finalidad.{terms ? ` Versión: ${terms.consentVersion}. ` : " "}
         <a href="/privacy" className="underline">
           Consultar Aviso de Privacidad
         </a>

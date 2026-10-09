@@ -4,6 +4,7 @@ import { build } from "esbuild";
 import { expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { PDFDocument } from "pdf-lib";
+import { fiscalIntegrationChecks } from "./fiscal-integration-checks.mjs";
 
 async function accessible(page, selector) {
   const result = await new AxeBuilder({ page })
@@ -20,6 +21,9 @@ async function accessible(page, selector) {
 }
 async function selectCode(page, label, code) {
   await page.getByRole("combobox", { name: label, exact: true }).fill(code);
+  await expect(
+    page.getByRole("option").filter({ hasText: code }).first(),
+  ).toBeVisible();
   await page
     .getByRole("combobox", { name: label, exact: true })
     .press("ArrowDown");
@@ -30,7 +34,10 @@ export async function fiscalUxChecks({ page, context, pass }) {
   // These scenarios exercise the real local application and its business APIs.
   const extractionRequests = [];
   const onRequest = (request) => {
-    if (/\/api\/fiscal-(consents|extractions)/.test(request.url()))
+    if (
+      request.method() === "POST" &&
+      /\/api\/fiscal-(consents|extractions)/.test(request.url())
+    )
       extractionRequests.push(request.url());
   };
   page.on("request", onRequest);
@@ -190,6 +197,7 @@ export async function fiscalUxChecks({ page, context, pass }) {
     "5C clients real create without CSF, separate controlled regime/CFDI use, catalog keyboard/empty/Escape and focus restoration",
   );
 
+  await fiscalIntegrationChecks({ page, context, pass });
   for (const width of [1440, 1280, 820, 390, 360]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/dashboard/fiscal-profile");

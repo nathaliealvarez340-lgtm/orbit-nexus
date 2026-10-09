@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { requirePageTenant } from "@/lib/tenant";
 import { fiscalProfileComplete, addressFields } from "@/lib/fiscal-catalogs";
 import { getDb } from "@/lib/db";
-import { cfdiUseCatalog, fiscalRegimeCatalog } from "@/lib/sat-catalogs";
 export default async function Page({
   searchParams,
 }: {
@@ -48,7 +47,7 @@ export default async function Page({
         <div className="surface p-5 text-sm text-zinc-400">
           {Object.keys(extracted || {}).length
             ? "Datos extraídos del receptor del XML. Revisa cada campo antes de guardar."
-            : "Documento recibido. La extracción automática de constancias PDF e imágenes está pendiente de proveedor; completa y confirma los datos manualmente."}
+            : "Documento recibido. Para leer una constancia PDF, cárgala en el flujo privado y autoriza su lectura. Puedes completar los datos manualmente."}
         </div>
       )}
       <p className="text-sm text-violet-300">
@@ -60,10 +59,6 @@ export default async function Page({
         key={`${organizationId}:${document || "profile"}`}
         initial={current}
         sourceValues={extracted}
-        catalogs={{
-          fiscalRegimes: fiscalRegimeCatalog,
-          cfdiUses: cfdiUseCatalog,
-        }}
         documentId={document}
         readOnly={role === "MEMBER"}
       />

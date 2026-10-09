@@ -76,21 +76,25 @@ export function CatalogCombobox({
   // Resolve persisted SAT codes through the same source used for search. A saved
   // code has no label in the detail DTO; never substitute a client-side catalog.
   useEffect(() => {
-    if (!endpoint || !value || picked?.code === value) return;
+    if ((!endpoint && !loadOptions) || !value || picked?.code === value) return;
     const controller = new AbortController();
-    studioRequest(`${endpoint}?q=${encodeURIComponent(value)}&limit=30`, {
-      signal: controller.signal,
-    })
-      .then(readCatalog)
-      .then((catalog) => {
+    const lookup = endpoint
+      ? studioRequest(`${endpoint}?q=${encodeURIComponent(value)}&limit=30`, {
+          signal: controller.signal,
+        })
+          .then(readCatalog)
+          .then((catalog) => catalog.results)
+      : loadOptions!(value, controller.signal);
+    lookup
+      .then((results) => {
         if (!controller.signal.aborted)
-          setPicked(catalog.results.find((option) => option.code === value));
+          setPicked(results.find((option) => option.code === value));
       })
       .catch(() => {
         // Keep the code visible. Its fiscal status still comes from validation.
       });
     return () => controller.abort();
-  }, [endpoint, value, picked?.code]);
+  }, [endpoint, loadOptions, value, picked?.code]);
   useEffect(() => {
     if (disabled || !open || (!endpoint && !loadOptions)) return;
     const controller = new AbortController();

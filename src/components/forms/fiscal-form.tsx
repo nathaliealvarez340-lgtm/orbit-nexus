@@ -12,6 +12,8 @@ import type { InvoiceFiscalCatalogs } from "@/types/invoice-studio";
 import { CsfPrefill } from "@/components/fiscal/csf-prefill";
 import {
   issuerCsfTransport,
+  fiscalRequest,
+  fiscalErrorMessage,
   type CsfTransport,
 } from "@/components/fiscal/transport";
 import { FiscalConfirmation } from "@/components/fiscal/fiscal-confirmation";
@@ -38,7 +40,7 @@ export function FiscalForm({
 }: {
   initial: Record<string, string>;
   sourceValues?: Record<string, string> | null;
-  catalogs: Pick<InvoiceFiscalCatalogs, "fiscalRegimes" | "cfdiUses">;
+  catalogs?: Pick<InvoiceFiscalCatalogs, "fiscalRegimes" | "cfdiUses">;
   documentId?: string;
   readOnly?: boolean;
   csfTransport?: CsfTransport;
@@ -101,7 +103,7 @@ export function FiscalForm({
             confirmed: true,
             ...(extraction ? { extractionId: extraction.id } : {}),
           };
-          const response = await fetch("/api/fiscal-profile", {
+          await fiscalRequest("/api/fiscal-profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -111,23 +113,16 @@ export function FiscalForm({
               csfDocumentId: csf || undefined,
             }),
           });
-          const data = await response.json();
-          if (!response.ok) {
-            setFailed(true);
-            setMessage(
-              typeof data.error === "string"
-                ? data.error
-                : "No pudimos guardar el perfil. Revisa los campos indicados.",
-            );
-            return;
-          }
           setMessage("✓ Información guardada correctamente");
           setConfirmed(false);
           router.refresh();
-        } catch {
+        } catch (failure) {
           setFailed(true);
           setMessage(
-            "No pudimos guardar el perfil fiscal. Inténtalo nuevamente.",
+            fiscalErrorMessage(
+              failure,
+              "No pudimos guardar el perfil fiscal. Inténtalo nuevamente.",
+            ),
           );
         } finally {
           lock.current = false;
@@ -212,6 +207,7 @@ export function FiscalForm({
             </select>
           </label>
           <FiscalCatalogFields
+            personType={values.personType}
             catalogs={catalogs}
             issuer
             regime={values.fiscalRegime || ""}

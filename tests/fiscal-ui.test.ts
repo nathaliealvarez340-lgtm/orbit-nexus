@@ -5,16 +5,17 @@ import {
   issuerCsfTransport,
   clientCsfTransport,
   type CsfTransport,
+  FiscalUiError,
+  fiscalErrorMessage,
 } from "../src/components/fiscal/transport";
 import { consent, consentRequest, extraction } from "./fiscal-ui-fixture";
 
-test("production capabilities only expose the existing issuer upload; no fictitious extraction or client upload", () => {
-  assert.equal(typeof issuerCsfTransport.upload, "function");
-  assert.equal(issuerCsfTransport.extract, undefined);
-  assert.equal(issuerCsfTransport.consent, undefined);
-  assert.deepEqual(clientCsfTransport, {});
+test("both purposes expose real upload, terms, consent and extraction transports", () => {
+  for (const transport of [issuerCsfTransport, clientCsfTransport])
+    for (const key of ["upload", "terms", "consent", "extract"] as const)
+      assert.equal(typeof transport[key], "function");
 });
-test("missing acceptance, privacy version, or client identity prevent all processing", async () => {
+test("missing acceptance or client identity prevent all processing", async () => {
   let requests = 0;
   const transport: CsfTransport = {
     consent: async () => {
@@ -28,7 +29,6 @@ test("missing acceptance, privacy version, or client identity prevent all proces
   };
   for (const request of [
     { ...consentRequest, accepted: false },
-    { ...consentRequest, privacyNoticeVersion: null },
     { ...consentRequest, purpose: "CLIENT_FISCAL_PREFILL" },
   ]) {
     await assert.rejects(
@@ -36,6 +36,40 @@ test("missing acceptance, privacy version, or client identity prevent all proces
     );
   }
   assert.equal(requests, 0);
+});
+test("null privacy version is passed unchanged; backend remains production authority", async () => {
+  const result = await extractAuthorizedCsf(
+    {
+      consent: async (request) => {
+        assert.equal(request.privacyNoticeVersion, null);
+        return { ...consent, privacyNoticeVersion: null };
+      },
+      extract: async () => extraction,
+    },
+    { ...consentRequest, privacyNoticeVersion: null },
+  );
+  assert.equal(result.id, extraction.id);
+});
+test("normalized errors never display raw provider responses or stack traces", () => {
+  for (const code of [
+    "CONSENT_REQUIRED",
+    "CONSENT_VERSION_OUTDATED",
+    "PRIVACY_NOTICE_OUTDATED",
+    "PRIVACY_NOTICE_MISSING",
+    "DOCUMENT_NOT_AVAILABLE",
+    "DOCUMENT_NOT_SUPPORTED",
+    "CLIENT_REQUIRED",
+    "CLIENT_NOT_AVAILABLE",
+    "EXTRACTION_NOT_AVAILABLE",
+  ])
+    assert.notEqual(
+      fiscalErrorMessage(new FiscalUiError(code, 409), "fallback"),
+      "fallback",
+    );
+  assert.equal(
+    fiscalErrorMessage(new Error("private stack trace"), "safe"),
+    "safe",
+  );
 });
 test("mismatched consent document, purpose, client or versions prevent extraction", async () => {
   let extracts = 0;

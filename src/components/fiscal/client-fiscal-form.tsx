@@ -8,7 +8,11 @@ import type { InvoiceFiscalCatalogs } from "@/types/invoice-studio";
 import { addressFields } from "@/lib/fiscal-catalogs";
 import { Button } from "@/components/ui/button";
 import { CsfPrefill } from "./csf-prefill";
-import { clientCsfTransport } from "./transport";
+import {
+  clientCsfTransport,
+  fiscalRequest,
+  fiscalErrorMessage,
+} from "./transport";
 import { FiscalCatalogFields } from "./fiscal-catalog-fields";
 import { FiscalConfirmation } from "./fiscal-confirmation";
 import { FiscalExtractionReview } from "./fiscal-extraction-review";
@@ -32,10 +36,7 @@ export function ClientFiscalForm({
   onCancel,
 }: {
   initial: Record<string, unknown> | null;
-  catalogs: Pick<
-    InvoiceFiscalCatalogs,
-    "fiscalRegimes" | "cfdiUses" | "paymentForms"
-  >;
+  catalogs: Pick<InvoiceFiscalCatalogs, "paymentForms">;
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -97,7 +98,7 @@ export function ClientFiscalForm({
             confirmed: true,
             ...(extraction ? { extractionId: extraction.id } : {}),
           };
-          const response = await fetch(
+          await fiscalRequest(
             "/api/clients" + (id ? "/" + encodeURIComponent(id) : ""),
             {
               method: id ? "PATCH" : "POST",
@@ -112,18 +113,14 @@ export function ClientFiscalForm({
               }),
             },
           );
-          const data = await response.json();
-          if (!response.ok) {
-            setError(
-              typeof data.error === "string"
-                ? data.error
-                : "No pudimos guardar el cliente. Revisa los datos.",
-            );
-            return;
-          }
           onSaved();
-        } catch {
-          setError("No pudimos guardar el cliente. Inténtalo nuevamente.");
+        } catch (failure) {
+          setError(
+            fiscalErrorMessage(
+              failure,
+              "No pudimos guardar el cliente. Inténtalo nuevamente.",
+            ),
+          );
         } finally {
           lock.current = false;
           setBusy(false);
@@ -136,6 +133,11 @@ export function ClientFiscalForm({
       <CsfPrefill
         purpose="CLIENT_FISCAL_PREFILL"
         clientId={id}
+        documentId={
+          typeof initial?.csfDocumentId === "string"
+            ? initial.csfDocumentId
+            : undefined
+        }
         transport={clientCsfTransport}
         disabled={busy}
         onBusy={setDocumentBusy}
@@ -204,7 +206,7 @@ export function ClientFiscalForm({
             </select>
           </label>
           <FiscalCatalogFields
-            catalogs={catalogs}
+            personType={values.personType}
             regime={values.fiscalRegime || ""}
             cfdiUse={values.cfdiUse || ""}
             onRegime={(code) => {

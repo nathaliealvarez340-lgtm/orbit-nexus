@@ -8,7 +8,12 @@ import type {
 } from "@/types/fiscal-identity";
 import { Button } from "@/components/ui/button";
 import { FiscalConsent } from "./fiscal-consent";
-import { extractAuthorizedCsf, type CsfTransport } from "./transport";
+import {
+  extractAuthorizedCsf,
+  fiscalErrorMessage,
+  FiscalUiError,
+  type CsfTransport,
+} from "./transport";
 
 export function CsfPrefill({
   purpose,
@@ -36,6 +41,9 @@ export function CsfPrefill({
   const [terms, setTerms] = useState<FiscalConsentTerms>();
   const [busy, setBusy] = useState<"upload" | "extract" | null>(null);
   const [error, setError] = useState("");
+  const [termsAttempt, setTermsAttempt] = useState(0);
+  const [termsLoading, setTermsLoading] = useState(!!transport.terms);
+  const [unavailable, setUnavailable] = useState(false);
   const lock = useRef(false);
   useEffect(() => {
     if (!transport.terms) return;
@@ -48,16 +56,22 @@ export function CsfPrefill({
           setAccepted(false);
         }
       })
-      .catch(() => {
+      .catch((failure) => {
         if (!controller.signal.aborted)
           setError(
-            "No pudimos cargar la autorización de lectura. Puedes continuar manualmente.",
+            fiscalErrorMessage(
+              failure,
+              "No pudimos cargar la autorización de lectura. Puedes continuar manualmente.",
+            ),
           );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTermsLoading(false);
       });
     return () => controller.abort();
-  }, [purpose, transport]);
+  }, [purpose, transport, termsAttempt]);
   const connected =
-    !!transport.consent && !!transport.extract && !!terms?.privacyNoticeVersion;
+    !!transport.consent && !!transport.extract && !!terms && !termsLoading;
   const client = purpose === "CLIENT_FISCAL_PREFILL";
   return (
     <section
@@ -85,7 +99,13 @@ export function CsfPrefill({
           className="input mt-2"
           type="file"
           accept=".pdf,application/pdf"
-          disabled={disabled || !!busy || !transport.upload}
+          disabled={
+            disabled ||
+            unavailable ||
+            !!busy ||
+            !transport.upload ||
+            (client && !clientId)
+          }
           onChange={async (event) => {
             const file = event.target.files?.[0];
             event.target.value = "";
@@ -104,9 +124,12 @@ export function CsfPrefill({
               const uploaded = await transport.upload(file);
               setDocument(uploaded);
               onDocument(uploaded.id);
-            } catch {
+            } catch (failure) {
               setError(
-                "No pudimos cargar la constancia. Puedes revisar el archivo o continuar manualmente.",
+                fiscalErrorMessage(
+                  failure,
+                  "No pudimos cargar la constancia. Puedes revisar el archivo o continuar manualmente.",
+                ),
               );
             } finally {
               lock.current = false;
@@ -127,34 +150,49 @@ export function CsfPrefill({
           </a>
         </p>
       )}
+      {termsLoading && (
+        <p role="status" className="fiscal-help">
+          Cargando términos de autorización…
+        </p>
+      )}
       <FiscalConsent
         purpose={purpose}
         terms={terms}
         accepted={accepted}
         onChange={setAccepted}
-        disabled={disabled || !!busy || !document}
+        disabled={
+          disabled ||
+          unavailable ||
+          !!busy ||
+          !document ||
+          !connected ||
+          (client && !clientId)
+        }
       />
       {!connected && (
         <p className="fiscal-pending">
-          Lectura automática pendiente de integración: aún no hay consentimiento
-          auditable, extracción y Aviso de Privacidad versionado disponibles.
-          Esta casilla no registra una autorización; puedes completar y guardar
-          los datos manualmente.
+          La autorización de lectura aún no está disponible. Puedes completar y
+          guardar los datos manualmente.
         </p>
       )}
-      {!transport.upload && (
+      {terms && terms.privacyNoticeVersion === null && (
+        <p className="fiscal-pending">
+          Aviso de Privacidad sin versión publicada. El backend permite pruebas
+          locales y bloquea el procesamiento productivo sin aviso vigente. Esta
+          operación no representa aprobación para producción.
+        </p>
+      )}
+      {client && !clientId && (
         <p className="fiscal-help">
-          La carga privada de constancias de clientes está pendiente del
-          backend.
-          {!clientId
-            ? " Guarda primero el cliente para asociar el consentimiento a su registro."
-            : ""}
+          Guarda primero el cliente. Después podrás editarlo y cargar su
+          constancia opcional.
         </p>
       )}
       <Button
         variant="secondary"
         disabled={
           disabled ||
+          unavailable ||
           !!busy ||
           !accepted ||
           !document ||
@@ -186,10 +224,26 @@ export function CsfPrefill({
               privacyNoticeVersion: terms.privacyNoticeVersion,
             });
             onExtraction(result);
-          } catch {
+          } catch (failure) {
             setError(
-              "No pudimos leer la constancia. Puedes intentarlo nuevamente o completar los datos manualmente.",
+              fiscalErrorMessage(
+                failure,
+                "No pudimos leer la constancia. Puedes intentarlo nuevamente o completar los datos manualmente.",
+              ),
             );
+            if (failure instanceof FiscalUiError) {
+              if (failure.code === "CLIENT_NOT_AVAILABLE") setUnavailable(true);
+              if (
+                [
+                  "CONSENT_REQUIRED",
+                  "CONSENT_VERSION_OUTDATED",
+                  "PRIVACY_NOTICE_OUTDATED",
+                ].includes(failure.code ?? "")
+              ) {
+                setTerms(undefined);
+                setAccepted(false);
+              }
+            }
           } finally {
             lock.current = false;
             setBusy(null);
@@ -201,6 +255,20 @@ export function CsfPrefill({
           ? "Leyendo constancia…"
           : "Leer y prellenar constancia"}
       </Button>
+      {!busy && !termsLoading && !terms && transport.terms && (
+        <Button
+          variant="secondary"
+          disabled={disabled || unavailable}
+          onClick={() => {
+            setTermsLoading(true);
+            setAccepted(false);
+            setError("");
+            setTermsAttempt((attempt) => attempt + 1);
+          }}
+        >
+          Actualizar autorización
+        </Button>
+      )}
       {busy && (
         <p role="status" className="fiscal-help">
           {busy === "upload"

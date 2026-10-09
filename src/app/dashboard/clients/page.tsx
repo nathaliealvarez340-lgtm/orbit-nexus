@@ -3,11 +3,7 @@ import { listClients } from "@/services/clients";
 import { ClientEditor } from "@/components/forms/client-editor";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
-import {
-  cfdiUseCatalog,
-  fiscalRegimeCatalog,
-  paymentFormCatalog,
-} from "@/lib/sat-catalogs";
+import { paymentFormCatalog } from "@/lib/sat-catalogs";
 export default async function Page({
   searchParams,
 }: {
@@ -48,8 +44,6 @@ export default async function Page({
       <ClientEditor
         clients={JSON.parse(JSON.stringify(clients))}
         catalogs={{
-          fiscalRegimes: fiscalRegimeCatalog,
-          cfdiUses: cfdiUseCatalog,
           paymentForms: paymentFormCatalog,
         }}
       />

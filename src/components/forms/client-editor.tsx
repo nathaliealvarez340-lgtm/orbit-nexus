@@ -17,10 +17,7 @@ export function ClientEditor({
   catalogs,
 }: {
   clients: ClientData[];
-  catalogs: Pick<
-    InvoiceFiscalCatalogs,
-    "fiscalRegimes" | "cfdiUses" | "paymentForms"
-  >;
+  catalogs: Pick<InvoiceFiscalCatalogs, "paymentForms">;
 }) {
   const [editing, setEditing] = useState<ClientData | null>(null);
   const [open, setOpen] = useState(false);
