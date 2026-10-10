@@ -3,6 +3,10 @@ import { cfdiUses } from "./fiscal-catalogs";
 import { cfdiUseProblem, fiscalRegimeProblem } from "./fiscal-identity-rules";
 import { normalizeBillingUrl } from "./billing-url";
 
+// Fase 5C.2 §9: in the browser Zod would probe `new Function` to enable its JIT; the CSP
+// forbids eval and the probe is reported as a violation. Parsing is identical without it.
+if (typeof window !== "undefined") z.config({ jitless: true });
+
 export const passwordSchema = z
   .string()
   .min(12, "Usa al menos 12 caracteres")

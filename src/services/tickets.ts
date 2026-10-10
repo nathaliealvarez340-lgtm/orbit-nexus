@@ -1,8 +1,8 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
-import { ApiError, enforceRateLimit } from "@/lib/http";
-import { validateUpload, UploadValidationError } from "@/lib/upload-validation";
+import { ApiError, enforceRateLimit, uploadApiError } from "@/lib/http";
+import { documentFields, validateUpload } from "@/lib/upload-validation";
 import { expenseSchema, billingDetailsSchema } from "@/lib/validation";
 import { getTicketOcrProvider } from "@/services/ocr/adapter";
 import { randomUUID } from "node:crypto";
@@ -67,12 +67,9 @@ export async function uploadTicket(file: File) {
   await enforceRateLimit("upload:" + userId, 20, 3600);
   let data;
   try {
-    data = await validateUpload(file);
+    data = documentFields(await validateUpload(file, "TICKET"));
   } catch (e) {
-    throw new ApiError(
-      e instanceof UploadValidationError ? e.status : 400,
-      (e as Error).message,
-    );
+    throw uploadApiError(e);
   }
   return getDb().$transaction(async (tx) => {
     const doc = await tx.document.create({

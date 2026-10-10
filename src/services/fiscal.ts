@@ -1,9 +1,10 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { requireTenant, requireAdmin } from "@/lib/tenant";
-import { ApiError, enforceRateLimit } from "@/lib/http";
+import { ApiError, enforceRateLimit, uploadApiError } from "@/lib/http";
 import { fiscalSchema } from "@/lib/validation";
-import { validateUpload, UploadValidationError } from "@/lib/upload-validation";
+import { documentFields, validateUpload } from "@/lib/upload-validation";
+import { changedFieldNames, recordAuditEvent } from "@/lib/audit";
 import { assertCfdi40Document } from "@/lib/cfdi";
 import { z } from "zod";
 import { addressShape } from "@/lib/phase3-validation";
@@ -107,6 +108,30 @@ export async function saveFiscalProfile(input: unknown, documentId?: string) {
         entityId: result.id,
       },
     });
+    await recordAuditEvent(tx, {
+      action: "fiscal_profile.updated",
+      organizationId,
+      actorUserId: userId,
+      targetId: result.id,
+      metadata: {
+        changedFields: changedFieldNames(previous, result, [
+          ...Object.keys(data),
+          ...Object.keys(address),
+        ]),
+        source: extractionId ? "EXTRACTION" : "MANUAL",
+      },
+    });
+    if (extractionId)
+      await recordAuditEvent(tx, {
+        action: "csf.confirmed",
+        organizationId,
+        actorUserId: userId,
+        targetId: extractionId,
+        metadata: {
+          purpose: "FISCAL_PROFILE_PREFILL",
+          subject: "FISCAL_PROFILE",
+        },
+      });
     // Contract §11.3: a READY invoice whose issuer data changed must be revalidated.
     if (
       previous &&
@@ -124,20 +149,16 @@ export async function uploadFiscalDocument(file: File) {
   const { organizationId, userId, role } = await requireTenant();
   requireAdmin(role);
   await enforceRateLimit("fiscal-upload:" + userId, 10, 3600);
-  let data;
+  let upload;
   try {
-    data = await validateUpload(file, true);
+    upload = await validateUpload(file, "FISCAL_DOCUMENT");
   } catch (e) {
-    throw new ApiError(
-      e instanceof UploadValidationError ? e.status : 400,
-      (e as Error).message,
-    );
+    throw uploadApiError(e);
   }
+  const data = documentFields(upload);
   // Fase 5C D11: storing a document never extracts its data. Party data is read only
   // after explicit consent, through /api/fiscal-consents and /api/fiscal-extractions.
   if (data.mimeType === "application/xml") {
-    if (data.size > 1024 * 1024)
-      throw new ApiError(400, "El XML fiscal debe ser menor a 1 MB.");
     try {
       assertCfdi40Document(data.content.toString("utf8"));
     } catch {
@@ -166,6 +187,18 @@ export async function uploadFiscalDocument(file: File) {
         action: "FISCAL_DOCUMENT_UPLOADED",
         entityType: "UploadedFiscalDocument",
         entityId: fiscal.id,
+      },
+    });
+    await recordAuditEvent(tx, {
+      action: "sensitive_asset.uploaded",
+      organizationId,
+      actorUserId: userId,
+      targetId: doc.id,
+      metadata: {
+        kind: "FISCAL",
+        mimeType: data.mimeType,
+        sizeBytes: data.size,
+        malwareScan: upload.malwareScan,
       },
     });
     return { id: fiscal.id, documentId: doc.id };

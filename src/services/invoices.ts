@@ -1,8 +1,8 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
-import { ApiError, enforceRateLimit } from "@/lib/http";
-import { validateUpload, UploadValidationError } from "@/lib/upload-validation";
+import { ApiError, enforceRateLimit, uploadApiError } from "@/lib/http";
+import { documentFields, validateUpload } from "@/lib/upload-validation";
 import { parseCfdi } from "@/lib/cfdi";
 import { Prisma } from "@/generated/prisma/client";
 import type { BillingContext } from "./billing/types";
@@ -18,23 +18,24 @@ export async function importInvoice(
   if (!confirmed)
     throw new ApiError(400, "Confirma que el CFDI corresponde al ticket.");
   let file, data;
-  let pdfFile: Awaited<ReturnType<typeof validateUpload>> | undefined;
+  let pdfFile: ReturnType<typeof documentFields> | undefined;
   try {
-    file = await validateUpload(xml, true);
-    if (file.mimeType !== "application/xml")
-      throw new Error("Selecciona el XML del CFDI.");
-    data = parseCfdi(file.content.toString("utf8"));
-    if (pdf) {
-      pdfFile = await validateUpload(pdf);
-      if (pdfFile.mimeType !== "application/pdf")
-        throw new Error("El archivo adicional debe ser PDF.");
-    }
+    file = documentFields(await validateUpload(xml, "RECEIVED_CFDI_XML"));
   } catch (e) {
-    throw new ApiError(
-      e instanceof UploadValidationError ? e.status : 400,
-      (e as Error).message,
-    );
+    throw uploadApiError(e);
   }
+  try {
+    data = parseCfdi(file.content.toString("utf8"));
+  } catch (e) {
+    // parseCfdi only throws curated validation messages.
+    throw new ApiError(400, (e as Error).message);
+  }
+  if (pdf)
+    try {
+      pdfFile = documentFields(await validateUpload(pdf, "RECEIVED_CFDI_PDF"));
+    } catch (e) {
+      throw uploadApiError(e);
+    }
   return getDb().$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id=${ticketId} AND "organizationId"=${organizationId} FOR UPDATE`;
     const ticket = await tx.ticket.findFirst({

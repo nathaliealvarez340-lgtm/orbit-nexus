@@ -1,9 +1,15 @@
-// Fase 5C D12: the Privacy Notice version is supplied by the operator; ORBIT never
-// invents it. It may be null only while fiscal production stays blocked.
+// Fase 5C D12 / 5C.2 §5: the Privacy Notice version comes from the versioned legal
+// source (src/lib/legal/registry.ts); ORBIT never invents it. It is null while the
+// notice is a draft, and fiscal production stays blocked until it is published.
+import type { LegalDocument } from "@/types/legal";
+import { currentLegalDocument } from "./legal/registry";
+
 type Env = Record<string, string | undefined>;
 
-export function privacyNoticeVersion(env: Env = process.env) {
-  return env.PRIVACY_NOTICE_VERSION?.trim() || null;
+export function privacyNoticeVersion(
+  notice: LegalDocument = currentLegalDocument("PRIVACY_NOTICE"),
+) {
+  return notice.status === "PUBLISHED" ? notice.version : null;
 }
 
 /** Fiscal production: a production deployment or a production PAC environment (D14). */
@@ -14,6 +20,9 @@ export function fiscalProductionRequested(env: Env = process.env) {
 }
 
 /** True when fiscal document processing must stop because no Privacy Notice exists. */
-export function privacyNoticeBlocksProcessing(env: Env = process.env) {
-  return fiscalProductionRequested(env) && !privacyNoticeVersion(env);
+export function privacyNoticeBlocksProcessing(
+  env: Env = process.env,
+  notice: LegalDocument = currentLegalDocument("PRIVACY_NOTICE"),
+) {
+  return fiscalProductionRequested(env) && !privacyNoticeVersion(notice);
 }

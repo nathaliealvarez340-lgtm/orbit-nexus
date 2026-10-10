@@ -27,6 +27,7 @@ import {
   privacyNoticeBlocksProcessing,
   privacyNoticeVersion,
 } from "../src/lib/privacy-notice";
+import { buildLegalDocument } from "../src/lib/legal/registry";
 
 const sha256 = (data: Buffer | string) =>
   createHash("sha256").update(data).digest("hex");
@@ -338,23 +339,47 @@ test("CSF parser never invents data from blank or unreadable documents", async (
 });
 
 test("privacyNoticeVersion may be null only while fiscal production stays blocked", () => {
-  assert.equal(privacyNoticeVersion({}), null);
-  assert.equal(privacyNoticeVersion({ PRIVACY_NOTICE_VERSION: "  " }), null);
-  assert.equal(privacyNoticeBlocksProcessing({}), false);
-  assert.equal(privacyNoticeBlocksProcessing({ VERCEL_ENV: "preview" }), false);
+  // The version comes from the versioned legal source (Fase 5C.2), never from an env var.
+  const draft = buildLegalDocument("PRIVACY_NOTICE");
+  assert.equal(draft.status, "DRAFT");
+  assert.equal(privacyNoticeVersion(draft), null);
+  assert.equal(privacyNoticeVersion(), null);
+  assert.equal(privacyNoticeBlocksProcessing({}, draft), false);
   assert.equal(
-    privacyNoticeBlocksProcessing({ VERCEL_ENV: "production" }),
+    privacyNoticeBlocksProcessing({ VERCEL_ENV: "preview" }, draft),
+    false,
+  );
+  assert.equal(
+    privacyNoticeBlocksProcessing({ VERCEL_ENV: "production" }, draft),
     true,
   );
   assert.equal(
-    privacyNoticeBlocksProcessing({ PAC_ENVIRONMENT: "PRODUCTION" }),
+    privacyNoticeBlocksProcessing({ PAC_ENVIRONMENT: "PRODUCTION" }, draft),
     true,
   );
+  const published = buildLegalDocument(
+    "PRIVACY_NOTICE",
+    {
+      controller: {
+        name: "Responsable sintético de prueba",
+        address: "Domicilio sintético de prueba",
+      },
+      privacyContact: "privacidad@example.test",
+      termsContact: null,
+      retentionStatement: "Plazos sintéticos de prueba.",
+      providerDisclosure: "Proveedores sintéticos de prueba.",
+      governingLawAndJurisdiction: null,
+    },
+    {
+      version: "aviso-v1",
+      status: "PUBLISHED",
+      effectiveDate: "2026-11-01",
+      legalReviewApproved: true,
+    },
+  );
+  assert.equal(privacyNoticeVersion(published), "aviso-v1");
   assert.equal(
-    privacyNoticeBlocksProcessing({
-      VERCEL_ENV: "production",
-      PRIVACY_NOTICE_VERSION: "aviso-v1",
-    }),
+    privacyNoticeBlocksProcessing({ VERCEL_ENV: "production" }, published),
     false,
   );
 });

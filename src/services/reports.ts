@@ -1,7 +1,7 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
-import { ApiError } from "@/lib/http";
+import { ApiError, enforceRateLimit } from "@/lib/http";
 import type { ReportSnapshot } from "@/lib/report-periods";
 import { enrichInvoiceEvidence, listMonthlyReports } from "./monthly-reports";
 export async function monthlyReports() {
@@ -12,7 +12,9 @@ export async function monthlyReports() {
   });
 }
 export async function reportSnapshot(id: string) {
-  const { organizationId } = await requireTenant();
+  const { organizationId, userId } = await requireTenant();
+  // Every snapshot read feeds a PDF/XLSX export, an expensive operation (5C.2 §11).
+  await enforceRateLimit("report-export:" + userId, 60, 3600);
   const report = await getDb().monthlyExpenseReport.findFirst({
     where: { organizationId, id },
   });

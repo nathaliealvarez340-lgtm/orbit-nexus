@@ -16,6 +16,7 @@ import {
   privacyNoticeBlocksProcessing,
   privacyNoticeVersion,
 } from "@/lib/privacy-notice";
+import { recordAuditEvent } from "@/lib/audit";
 import { findEditableClient } from "./clients";
 import type {
   ExtractedFiscalField,
@@ -243,6 +244,15 @@ export async function createFiscalExtraction(
     where: { id: consentId, organizationId },
   });
   // Without a consent of this user in this Organization the document is never processed.
+  if (consent && consent.userId !== userId)
+    await recordAuditEvent(db, {
+      action: "csf.extraction_requested",
+      organizationId,
+      actorUserId: userId,
+      targetId: consent.id,
+      result: "DENIED",
+      metadata: { purpose: consent.purpose, reason: "CONSENT_OF_ANOTHER_USER" },
+    });
   if (!consent || consent.userId !== userId)
     throw new CodedApiError(
       404,
@@ -265,8 +275,21 @@ export async function createFiscalExtraction(
     where: { organizationId, consentId, parserVersion: CSF_PARSER_VERSION },
     orderBy: { createdAt: "desc" },
   });
-  if (existing)
+  if (existing) {
+    await recordAuditEvent(db, {
+      action: "csf.extraction_requested",
+      organizationId,
+      actorUserId: userId,
+      targetId: consent.id,
+      metadata: {
+        purpose: consent.purpose,
+        status: existing.status,
+        parserVersion: existing.parserVersion,
+        reused: true,
+      },
+    });
     return { created: false, result: await extractionDto(existing) };
+  }
   const document = await db.document.findFirst({
     where: { id: consent.documentId, organizationId },
     select: { content: true, mimeType: true },
@@ -314,6 +337,18 @@ export async function createFiscalExtraction(
         entityType: "FiscalDocumentExtraction",
         entityId: extraction.id,
         metadata: { status: parsed.status },
+      },
+    });
+    await recordAuditEvent(tx, {
+      action: "csf.extraction_requested",
+      organizationId,
+      actorUserId: userId,
+      targetId: consent.id,
+      metadata: {
+        purpose: consent.purpose,
+        status: parsed.status,
+        parserVersion: CSF_PARSER_VERSION,
+        reused: false,
       },
     });
     return extraction;

@@ -19,22 +19,33 @@ const png = Buffer.from(
 test("uploads validate extension, MIME, signature, size and safe names", async () => {
   const valid = await validateUpload(
     new File([png], "../../ticket.png", { type: "image/png" }),
+    "TICKET",
   );
   assert(!valid.fileName.includes("/"));
   await assert.rejects(() =>
-    validateUpload(new File([png], "ticket.pdf", { type: "application/pdf" })),
+    validateUpload(
+      new File([png], "ticket.pdf", { type: "application/pdf" }),
+      "TICKET",
+    ),
   );
   await assert.rejects(() =>
-    validateUpload(new File(["html"], "ticket.png", { type: "image/png" })),
+    validateUpload(
+      new File(["html"], "ticket.png", { type: "image/png" }),
+      "TICKET",
+    ),
   );
   await assert.rejects(() =>
-    validateUpload(new File([png], "ticket.svg", { type: "image/svg+xml" })),
+    validateUpload(
+      new File([png], "ticket.svg", { type: "image/svg+xml" }),
+      "TICKET",
+    ),
   );
   await assert.rejects(() =>
     validateUpload(
       new File([new Uint8Array(MAX_UPLOAD_BYTES + 1)], "ticket.png", {
         type: "image/png",
       }),
+      "TICKET",
     ),
   );
   await assert.rejects(() =>
@@ -44,7 +55,7 @@ test("uploads validate extension, MIME, signature, size and safe names", async (
         "fiscal.xml",
         { type: "application/xml" },
       ),
-      true,
+      "FISCAL_DOCUMENT",
     ),
   );
 });

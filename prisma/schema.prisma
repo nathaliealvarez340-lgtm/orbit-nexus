@@ -67,6 +67,7 @@ model Organization {
   savedInvoiceConcepts SavedInvoiceConcept[]
   fiscalConsents  FiscalDocumentConsent[]
   fiscalExtractions FiscalDocumentExtraction[]
+  auditEvents     AuditEvent[]
 }
 
 model Membership {
@@ -227,6 +228,8 @@ model User {
   invoices          Invoice[]
   stampedInvoices   StampedInvoice[]
   activityLogs      ActivityLog[]
+  auditEvents       AuditEvent[]
+  legalAcceptances  LegalAcceptance[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -816,4 +819,51 @@ model BillingAttemptEvent {
   createdAt      DateTime @default(now())
 
   @@index([organizationId, attemptId, createdAt])
+}
+
+// Fase 5C.2 §6: append-only security audit trail, separate from the ActivityLog feed.
+// Tenant events carry the server-resolved Organization; account-level events (legal
+// acceptance outside a workspace) have none and are visible only to their actor.
+// Metadata is sanitized by src/lib/audit.ts: never documents, secrets or fiscal payloads.
+enum AuditResult {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+model AuditEvent {
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actorUserId    String?
+  actor          User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  action         String
+  targetType     String
+  targetId       String?
+  result         AuditResult   @default(SUCCESS)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([targetType, targetId])
+}
+
+// Fase 5C.2 §5: evidence that a person accepted an exact published legal text.
+enum LegalDocumentKind {
+  TERMS
+  PRIVACY_NOTICE
+}
+
+model LegalAcceptance {
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document    LegalDocumentKind
+  version     String
+  contentHash String
+  acceptedAt  DateTime          @default(now())
+
+  @@unique([userId, document, version])
+  @@index([userId, acceptedAt])
 }

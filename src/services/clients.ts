@@ -3,6 +3,7 @@ import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
 import { ApiError, enforceRateLimit } from "@/lib/http";
 import { clientSchema } from "@/lib/phase3-validation";
+import { changedFieldNames, recordAuditEvent } from "@/lib/audit";
 import type { Prisma } from "@/generated/prisma/client";
 import { revertReadyInvoices } from "./outgoing-invoices";
 
@@ -15,6 +16,20 @@ const receiverFiscalFields = [
   "postalCode",
   "foreignTaxId",
   "country",
+] as const;
+// Fiscal identity of a client: changes to any of them are audited (5C.2 §6).
+const clientFiscalAuditFields = [
+  ...receiverFiscalFields,
+  "cfdiUse",
+  "defaultPaymentForm",
+  "street",
+  "exteriorNumber",
+  "interiorNumber",
+  "colony",
+  "locality",
+  "municipality",
+  "state",
+  "csfDocumentId",
 ] as const;
 
 /**
@@ -100,6 +115,31 @@ export async function saveClient(input: unknown, id?: string) {
         entityId: result.id,
       },
     });
+    const changedFields = changedFieldNames(
+      previous,
+      result,
+      clientFiscalAuditFields,
+    );
+    if (changedFields.length)
+      await recordAuditEvent(tx, {
+        action: "client.fiscal.updated",
+        organizationId,
+        actorUserId: userId,
+        targetId: result.id,
+        metadata: {
+          operation: id ? "UPDATE" : "CREATE",
+          changedFields,
+          source: extractionId ? "EXTRACTION" : "MANUAL",
+        },
+      });
+    if (extractionId)
+      await recordAuditEvent(tx, {
+        action: "csf.confirmed",
+        organizationId,
+        actorUserId: userId,
+        targetId: extractionId,
+        metadata: { purpose: "CLIENT_FISCAL_PREFILL", subject: "CLIENT" },
+      });
     // Contract §11.3: READY invoices for this receiver must be revalidated.
     if (
       previous &&
@@ -132,6 +172,13 @@ export async function archiveClient(id: string) {
         entityType: "Client",
         entityId: id,
       },
+    });
+    await recordAuditEvent(tx, {
+      action: "client.fiscal.updated",
+      organizationId,
+      actorUserId: userId,
+      targetId: id,
+      metadata: { operation: "ARCHIVE", source: "MANUAL" },
     });
     await revertReadyInvoices(tx, {
       organizationId,

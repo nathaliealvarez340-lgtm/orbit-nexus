@@ -3,6 +3,9 @@ import { ZodError } from "zod";
 import { createHash } from "node:crypto";
 import { getDb } from "./db";
 import { authOrigin } from "./auth-origin";
+import { UploadValidationError } from "./upload-validation";
+import { logSafeError } from "./security/redact";
+import { postgresRateLimitStore } from "./security/rate-limit";
 
 export class ApiError extends Error {
   constructor(
@@ -23,11 +26,19 @@ export function apiError(error: unknown) {
       },
       { status: 400 },
     );
-  // Never log requests, credentials, documents, fiscal data or provider errors.
+  // Never log requests, credentials, documents, fiscal data or provider errors: only the
+  // error class and its stable code, so incidents can be investigated (5C.2 §7).
+  logSafeError("api", error);
   return Response.json(
     { error: "No pudimos completar la operación. Intenta nuevamente." },
     { status: 503 },
   );
+}
+/** Upload rejections keep their curated message; anything unexpected stays generic. */
+export function uploadApiError(error: unknown) {
+  return error instanceof UploadValidationError
+    ? new ApiError(error.status, error.message)
+    : new ApiError(400, "Archivo inválido.");
 }
 export function assertSameOrigin(request: Request) {
   const expected = authOrigin();
@@ -83,12 +94,7 @@ export async function enforceRateLimit(
   windowSeconds = 60,
 ) {
   const hash = createHash("sha256").update(key).digest("hex");
-  const now = new Date();
-  const expires = new Date(now.getTime() + windowSeconds * 1000);
-  const rows = await getDb().$queryRaw<Array<{ count: number }>>`
-    INSERT INTO "RequestLimit" ("key", "count", "expiresAt") VALUES (${hash}, 1, ${expires})
-    ON CONFLICT ("key") DO UPDATE SET "count" = CASE WHEN "RequestLimit"."expiresAt" <= ${now} THEN 1 ELSE "RequestLimit"."count" + 1 END,
-    "expiresAt" = CASE WHEN "RequestLimit"."expiresAt" <= ${now} THEN ${expires} ELSE "RequestLimit"."expiresAt" END RETURNING "count"`;
-  if (rows[0].count > limit)
+  const count = await postgresRateLimitStore(getDb()).hit(hash, windowSeconds);
+  if (count > limit)
     throw new ApiError(429, "Demasiadas solicitudes. Espera un momento.");
 }

@@ -1,16 +1,10 @@
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
+  // Fase 5C.2 §9: CSP, clickjacking, MIME, referrer, permissions and private caching.
   async headers() {
-    return ["/api/:path*", "/dashboard/:path*"].map((source) => ({
-      source,
-      headers: [
-        { key: "Cache-Control", value: "private, no-store" },
-        { key: "X-Content-Type-Options", value: "nosniff" },
-        { key: "Referrer-Policy", value: "no-referrer" },
-        { key: "X-Frame-Options", value: "DENY" },
-      ],
-    }));
+    return securityHeaders();
   },
 };
 
