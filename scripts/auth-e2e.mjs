@@ -80,7 +80,7 @@ try {
   await expect(page).toHaveURL(/\/login$/);
   pass("anonymous dashboard and continuation require login");
   await page.goto("/register");
-  await page.getByRole("button", { name: "Rechazar no esenciales" }).click();
+  await page.getByRole("button", { name: "Rechazar analíticas" }).click();
   await page.getByLabel("Nombre", { exact: true }).fill("Auth Owner");
   await page.getByLabel("Correo", { exact: true }).fill(email);
   await page.getByLabel("Contraseña", { exact: true }).fill(password);

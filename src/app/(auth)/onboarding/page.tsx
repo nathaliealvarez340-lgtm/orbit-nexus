@@ -1,3 +1,4 @@
+import { privateRobots } from "@/lib/web-metadata";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/tenant";
@@ -5,6 +6,8 @@ import { ApiError } from "@/lib/http";
 import { getDb } from "@/lib/db";
 import { OrganizationForm } from "@/components/forms/organization-form";
 import { OrganizationSwitcher } from "@/components/dashboard/organization-switcher";
+export const metadata = { title: "Tu organización", robots: privateRobots };
+
 export default async function Page() {
   const user = await requireUser().catch((e) => {
     if (e instanceof ApiError && e.status === 401) redirect("/login");

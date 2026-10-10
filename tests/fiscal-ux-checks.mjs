@@ -243,9 +243,7 @@ export async function fiscalUxChecks({ page, context, pass }) {
       await expect(
         menu.getByRole("region", { name: "Preferencias de cookies" }),
       ).toBeVisible();
-      await menu
-        .getByRole("button", { name: "Rechazar no esenciales" })
-        .click();
+      await menu.getByRole("button", { name: "Rechazar analíticas" }).click();
       await expect(
         menu.getByRole("button", {
           name: "Preferencias de cookies",
@@ -274,12 +272,10 @@ export async function fiscalUxChecks({ page, context, pass }) {
     await accessible(page, ".orbit-app");
     if (
       await page
-        .getByRole("button", { name: "Rechazar no esenciales" })
+        .getByRole("button", { name: "Rechazar analíticas" })
         .isVisible()
     )
-      await page
-        .getByRole("button", { name: "Rechazar no esenciales" })
-        .click();
+      await page.getByRole("button", { name: "Rechazar analíticas" }).click();
     await page.goto("/dashboard/fiscal-profile");
     await page
       .getByRole("combobox", { name: "Régimen fiscal", exact: true })

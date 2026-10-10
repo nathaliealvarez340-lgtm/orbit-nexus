@@ -8,6 +8,7 @@ import type {
   FiscalCatalogSearchResponse,
   SavedInvoiceConcept,
 } from "@/types/invoice-studio";
+import { safeFormError } from "@/lib/form-errors";
 
 export class StudioRequestError extends Error {
   constructor(
@@ -35,9 +36,10 @@ export async function studioRequest(
   if (!response.ok) {
     const body = record(value);
     throw new StudioRequestError(
-      typeof body.error === "string"
-        ? body.error
-        : "No pudimos completar la operación. Tu captura permanece en esta pantalla.",
+      safeFormError(
+        body,
+        "No pudimos completar la operación. Tu captura permanece en esta pantalla.",
+      ),
       response.status,
       typeof body.code === "string" ? body.code : undefined,
       body.validation ? readValidation(body.validation) : undefined,

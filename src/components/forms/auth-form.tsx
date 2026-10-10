@@ -6,11 +6,13 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { registerSchema } from "@/lib/validation";
+import { FormFeedback } from "./form-feedback";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState("");
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (lock.current) return;
@@ -18,13 +20,19 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     if (mode === "register") {
       const result = registerSchema.safeParse(fields);
       if (!result.success) {
-        setError(result.error.issues[0].message);
+        setInvalidFields(
+          result.error.issues.map((issue) => String(issue.path[0])),
+        );
+        setError(
+          "Revisa los datos. Usa una contraseña de al menos 12 caracteres, con mayúscula, minúscula y número, y confirma que coincida.",
+        );
         return;
       }
     }
     lock.current = true;
     setBusy(true);
     setError("");
+    setInvalidFields([]);
     let navigating = false;
     try {
       const credentials = {
@@ -61,7 +69,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
   }
   return (
-    <form onSubmit={submit} className="mt-8 space-y-4">
+    <form onSubmit={submit} className="mt-8 space-y-4" aria-busy={busy}>
       {mode === "register" && (
         <Field label="Nombre">
           <input
@@ -141,11 +149,12 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <ArrowRight className="size-4" />
         )}
       </Button>
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
-      )}
+      <FormFeedback
+        message={error}
+        error={!!error}
+        busy={busy}
+        fields={invalidFields}
+      />
     </form>
   );
 }

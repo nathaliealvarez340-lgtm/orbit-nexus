@@ -11,6 +11,7 @@ import type {
   ValidateInvoiceDraftResponse,
 } from "@/types/invoice-studio";
 import { Button } from "@/components/ui/button";
+import { FormFeedback } from "./form-feedback";
 import {
   DocumentSections,
   type UpdateDraftField,
@@ -57,6 +58,7 @@ export function OutgoingInvoiceForm({
     [message, setMessage] = useState("");
   const [conflict, setConflict] = useState(false),
     [uncertain, setUncertain] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [reload, setReload] = useState(0),
     [view, setView] = useState<"preview" | "review" | null>(null);
   const revision = useRef(0),
@@ -91,10 +93,16 @@ export function OutgoingInvoiceForm({
         setConflict(false);
         setUncertain(false);
         setMessage("");
+        setFailed(false);
         if (initialView) setView(initialView);
       })
       .catch((error: Error) => {
-        if (!controller.signal.aborted) setLoadError(error.message);
+        if (!controller.signal.aborted)
+          setLoadError(
+            error instanceof StudioRequestError
+              ? error.message
+              : "No pudimos conectar con Invoice Studio. Intenta cargarlo nuevamente.",
+          );
       });
     return () => {
       controller.abort();
@@ -132,7 +140,11 @@ export function OutgoingInvoiceForm({
       }
     } catch (error) {
       if (!controller.signal.aborted && version === revision.current) {
-        setValidationError((error as Error).message);
+        setValidationError(
+          error instanceof StudioRequestError
+            ? error.message
+            : "No pudimos validar los datos. Tu captura permanece aquí.",
+        );
         if (error instanceof StudioRequestError && error.validation)
           setEvaluation({ totals: null, validation: error.validation });
       }
@@ -161,6 +173,7 @@ export function OutgoingInvoiceForm({
     setValidating(false);
     setDirty(true);
     setMessage("");
+    setFailed(false);
   }
   const change: UpdateDraftField = (field, value) => {
     if (locked.current || uncertain || conflict) return;
@@ -211,6 +224,7 @@ export function OutgoingInvoiceForm({
     setValidating(false);
     setBusy("save");
     setMessage("");
+    setFailed(false);
     let accepted = false;
     try {
       idempotencyKey.current ??= crypto.randomUUID();
@@ -250,6 +264,7 @@ export function OutgoingInvoiceForm({
         "Borrador guardado. Puedes continuar editando o revisar el documento.",
       );
     } catch (error) {
+      setFailed(true);
       if (error instanceof StudioRequestError) {
         if (error.validation)
           setEvaluation({ totals: null, validation: error.validation });
@@ -262,7 +277,11 @@ export function OutgoingInvoiceForm({
       else {
         if (!(error instanceof StudioRequestError) || error.status >= 500)
           setUncertain(true);
-        setMessage((error as Error).message);
+        setMessage(
+          error instanceof StudioRequestError
+            ? error.message
+            : "No pudimos confirmar el guardado. Conservamos tu captura; revisa los borradores antes de reintentar.",
+        );
       }
     } finally {
       locked.current = false;
@@ -284,6 +303,7 @@ export function OutgoingInvoiceForm({
     locked.current = true;
     setBusy("ready");
     setMessage("");
+    setFailed(false);
     try {
       readSaved(
         await studioRequest(
@@ -310,7 +330,12 @@ export function OutgoingInvoiceForm({
       setMessage("Borrador listo para revisión. Documento aún no timbrado.");
     } catch (error) {
       setEvaluation(undefined);
-      setMessage((error as Error).message);
+      setFailed(true);
+      setMessage(
+        error instanceof StudioRequestError
+          ? error.message
+          : "No pudimos confirmar la operación. Revisa el estado guardado antes de continuar.",
+      );
       if (error instanceof StudioRequestError) {
         if (error.code === "DRAFT_CONFLICT") setConflict(true);
         if (error.validation)
@@ -400,6 +425,7 @@ export function OutgoingInvoiceForm({
       </div>
       <form
         ref={form}
+        aria-busy={!!busy}
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
@@ -530,9 +556,11 @@ export function OutgoingInvoiceForm({
               {busy === "save" ? "Guardando…" : "Guardar borrador"}
             </Button>
           </div>
-          <p role="status" className="text-sm text-zinc-300">
-            {message}
-          </p>
+          <FormFeedback
+            message={conflict || uncertain ? "" : message}
+            error={failed && !conflict && !uncertain}
+            busy={!!busy}
+          />
           {saved && (
             <Link
               className="studio-link"

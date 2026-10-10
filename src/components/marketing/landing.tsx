@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { LegalLinks } from "@/components/privacy/legal-links";
 
 const nav = ["Producto", "Cómo funciona", "Empresas compatibles", "Timbrado", "Precios"];
 const features = [
@@ -72,7 +73,7 @@ export function Landing() {
       <section id="timbrado" className="px-5 py-28"><div className="mx-auto grid max-w-6xl gap-12 rounded-[32px] border border-white/[.08] bg-gradient-to-br from-violet-500/[.12] to-transparent p-8 md:grid-cols-2 md:p-14"><div><span className="text-xs font-semibold uppercase tracking-[.2em] text-violet-400">Preparado para crecer</span><h2 className="mt-5 text-4xl font-semibold tracking-[-.05em]">De captura asistida a automatización completa.</h2><p className="mt-5 leading-7 text-zinc-400">La arquitectura desacopla OCR, reglas por empresa y proveedor de timbrado para integrar servicios reales sin reconstruir el producto.</p><Button href="/register" className="mt-8">Comenzar ahora <ArrowRight className="size-4" /></Button></div><div className="space-y-3">{["Datos fiscales validados", "Reglas configurables por empresa", "Proveedor OCR intercambiable", "Integración PAC desacoplada", "Actividad auditable"].map((item) => <div key={item} className="flex items-center gap-3 rounded-xl border border-white/[.06] bg-black/20 p-4 text-sm text-zinc-300"><Check className="size-4 text-emerald-400" />{item}</div>)}</div></div></section>
 
       <section id="precios" className="mx-auto max-w-4xl px-5 py-28 text-center"><Fingerprint className="mx-auto size-7 text-violet-400" /><h2 className="mt-6 text-4xl font-semibold tracking-[-.05em]">Tu información fiscal merece un sistema serio.</h2><p className="mx-auto mt-4 max-w-xl text-zinc-500">Empieza con la base diseñada para acompañar tu operación desde el primer ticket.</p><Button href="/register" className="mt-8 h-12 px-6">Crear cuenta gratis</Button></section>
-      <footer className="border-t border-white/[.06] px-5 py-8"><div className="mx-auto flex max-w-7xl items-center justify-between"><Logo /><p className="text-xs text-zinc-600">© 2026 ORBIT NEXUS · Fiscal intelligence infrastructure</p></div></footer>
+      <footer className="border-t border-white/[.06] px-5 py-8"><div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-5"><Logo /><LegalLinks /><p className="text-xs text-zinc-400">© 2026 ORBIT NEXUS · Fiscal intelligence infrastructure</p></div></footer>
     </main>
   );
 }

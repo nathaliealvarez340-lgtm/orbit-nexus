@@ -1,19 +1,24 @@
 "use client";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { FormFeedback } from "./form-feedback";
+import { safeFormError, errorFields } from "@/lib/form-errors";
 export function OrganizationForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fields, setFields] = useState<string[]>([]);
   const lock = useRef(false);
   return (
     <form
       className="mt-7 space-y-5"
+      aria-busy={busy}
       onSubmit={async (e) => {
         e.preventDefault();
         if (lock.current) return;
         lock.current = true;
         setBusy(true);
         setError("");
+        setFields([]);
         const name = new FormData(e.currentTarget).get("name");
         let navigating = false;
         try {
@@ -24,7 +29,13 @@ export function OrganizationForm() {
           });
           const data = await res.json();
           if (!res.ok) {
-            setError(data.error);
+            setError(
+              safeFormError(
+                data,
+                "No pudimos crear la organización. Revisa el nombre o intenta más tarde.",
+              ),
+            );
+            setFields(errorFields(data, ["name"]));
             return;
           }
           // A new workspace must not reuse a previously cached tenant layout.
@@ -59,11 +70,12 @@ export function OrganizationForm() {
       >
         {busy ? "Creando…" : "Crear organización"}
       </Button>
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
-      )}
+      <FormFeedback
+        message={error}
+        error={!!error}
+        busy={busy}
+        fields={fields}
+      />
     </form>
   );
 }

@@ -1,5 +1,8 @@
+import { publicMetadata } from "@/lib/web-metadata";
 import Link from "next/link";
 import { AuthForm } from "@/components/forms/auth-form";
+
+export const metadata = publicMetadata("Crear cuenta", "/register");
 
 export default function RegisterPage() {
   return (

@@ -1,5 +1,8 @@
+import { publicMetadata } from "@/lib/web-metadata";
 import Link from "next/link";
 import { AuthForm } from "@/components/forms/auth-form";
+
+export const metadata = publicMetadata("Iniciar sesión", "/login");
 
 export default function LoginPage() {
   return (

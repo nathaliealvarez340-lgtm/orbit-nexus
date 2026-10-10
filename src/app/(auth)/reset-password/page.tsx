@@ -1,5 +1,8 @@
+import { privateRobots } from "@/lib/web-metadata";
 import Link from "next/link";
 import { RecoveryForm } from "@/components/forms/recovery-form";
+export const metadata = { title: "Nueva contraseña", robots: privateRobots };
+
 export default async function Page({
   searchParams,
 }: {

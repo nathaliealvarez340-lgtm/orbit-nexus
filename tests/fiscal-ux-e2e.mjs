@@ -121,7 +121,7 @@ try {
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Rechazar no esenciales" }).click();
+  await page.getByRole("button", { name: "Rechazar analíticas" }).click();
   await fiscalUxChecks({ page, context, pass });
   assert.deepEqual(errors, []);
   await writeFile(

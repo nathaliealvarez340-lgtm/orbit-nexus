@@ -57,6 +57,7 @@ export function FiscalCatalogFields({
         key={`regime:${personType}`}
         label="Régimen fiscal"
         name="fiscalRegime"
+        field="fiscalRegime"
         value={regime}
         options={catalogs?.fiscalRegimes}
         loadOptions={catalogs ? undefined : loadRegimes}
@@ -68,6 +69,7 @@ export function FiscalCatalogFields({
         key={`use:${personType}:${regime}`}
         label={issuer ? "Uso CFDI predeterminado" : "Uso CFDI"}
         name="cfdiUse"
+        field="cfdiUse"
         value={cfdiUse}
         options={catalogs?.cfdiUses}
         loadOptions={catalogs ? undefined : loadUses}

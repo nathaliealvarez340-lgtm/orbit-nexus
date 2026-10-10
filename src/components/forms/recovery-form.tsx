@@ -1,18 +1,25 @@
 "use client";
 import { PasswordInput } from "@/components/ui/password-input";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { passwordSchema } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
+import { FormFeedback } from "./form-feedback";
 export function RecoveryForm({ token }: { token?: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false),
+    [fields, setFields] = useState<string[]>([]);
+  const lock = useRef(false);
   return (
     <form
       className="mt-6 space-y-4"
+      aria-busy={busy}
       onSubmit={async (e) => {
         e.preventDefault();
-        if (busy) return;
+        if (lock.current) return;
+        setFailed(false);
+        setFields([]);
         const data = new FormData(e.currentTarget);
         const password = String(data.get("password"));
         if (
@@ -20,11 +27,14 @@ export function RecoveryForm({ token }: { token?: string }) {
           (!passwordSchema.safeParse(password).success ||
             password !== data.get("confirm"))
         ) {
+          setFailed(true);
+          setFields(["password", "confirm"]);
           setMessage(
             "Usa 12 caracteres, mayúscula, minúscula y número. Ambas contraseñas deben coincidir.",
           );
           return;
         }
+        lock.current = true;
         setBusy(true);
         setMessage("");
         try {
@@ -34,6 +44,7 @@ export function RecoveryForm({ token }: { token?: string }) {
                 email: String(data.get("email")),
                 redirectTo: "/reset-password",
               });
+          setFailed(!!result.error);
           setMessage(
             result.error
               ? "No fue posible completar la solicitud. El enlace puede haber expirado o el correo aún no está habilitado."
@@ -42,8 +53,10 @@ export function RecoveryForm({ token }: { token?: string }) {
                 : "Si existe una cuenta con este correo, recibirás instrucciones para recuperar el acceso.",
           );
         } catch {
+          setFailed(true);
           setMessage("No pudimos conectar. Intenta más tarde.");
         } finally {
+          lock.current = false;
           setBusy(false);
         }
       }}
@@ -96,9 +109,12 @@ export function RecoveryForm({ token }: { token?: string }) {
             ? "Actualizar contraseña"
             : "Solicitar recuperación"}
       </Button>
-      <p role="status" className="text-sm text-zinc-400">
-        {message}
-      </p>
+      <FormFeedback
+        message={message}
+        error={failed}
+        busy={busy}
+        fields={fields}
+      />
     </form>
   );
 }

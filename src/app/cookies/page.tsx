@@ -1,50 +1,47 @@
-import Link from "next/link";
-import { cookies } from "next/headers";
-import { Logo } from "@/components/brand/logo";
-import { CookieConsent } from "@/components/privacy/cookie-consent";
-import { parseConsent } from "@/lib/consent";
-export default async function Page() {
+import { LegalPage } from "@/components/privacy/legal-page";
+import { CookiePreferencesButton } from "@/components/privacy/cookie-consent";
+import { COOKIE_POLICY_VERSION } from "@/lib/consent";
+import { publicMetadata } from "@/lib/web-metadata";
+export const metadata = publicMetadata("Cookies y preferencias", "/cookies");
+export default function Page() {
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
-      <Logo />
-      <h1 className="mt-12 text-3xl font-semibold">Cookies y preferencias</h1>
-      <div className="mt-7 space-y-5 text-sm leading-7 text-zinc-400">
-        <p>
-          Las cookies necesarias mantienen tu cuenta segura y recuerdan tu
-          organización. No se desactivan con la elección de cookies opcionales.
-        </p>
-        <ul className="list-disc space-y-3 pl-5">
-          <li>
-            Better Auth: sesión de siete días, con renovación durante el uso;
-            cookies HttpOnly, SameSite=Lax y Secure en producción.
-          </li>
-          <li>
-            orbit.organization: selección de organización durante siete días. No
-            concede acceso: el servidor comprueba la membresía.
-          </li>
-          <li>orbit.consent: guarda tus preferencias durante seis meses.</li>
-        </ul>
-        <p>
-          Analíticas y marketing están desactivadas salvo consentimiento. No hay
-          proveedores de analítica ni publicidad instalados en esta versión.
-          Cualquier integración futura debe respetar cada categoría y dejar de
-          cargar al retirar el consentimiento.
-        </p>
-        <p>
-          Puedes rechazar todas las no esenciales o ajustar categorías con el
-          control de preferencias de esta página. Este texto describe el
-          comportamiento técnico actual; el operador debe revisar y completar la
-          política antes de publicar.
-        </p>
-      </div>
-      <div className="mt-8 flex gap-5 text-violet-300">
-        <Link href="/privacy">Privacidad</Link>
-        <Link href="/terms">Términos</Link>
-        <Link href="/login">Acceso</Link>
-      </div>
-      <CookieConsent
-        initial={parseConsent((await cookies()).get("orbit.consent")?.value)}
-      />
-    </main>
+    <LegalPage
+      content={{
+        title: "Cookies y preferencias",
+        summary:
+          "Las necesarias permanecen activas. Tú decides si permites analíticas.",
+        version: null,
+        effectiveDate: null,
+        approved: true,
+        sections: [
+          {
+            id: "necesarias",
+            title: "ESSENTIAL · Siempre activas",
+            paragraphs: [
+              "Better Auth mantiene tu sesión mediante cookies HttpOnly, SameSite=Lax y Secure en producción, durante siete días con renovación durante el uso.",
+              "orbit.organization recuerda tu organización durante siete días. No concede acceso: el servidor comprueba tu membresía.",
+              "orbit.consent guarda únicamente la versión de preferencias, la elección de analíticas y la fecha de elección durante seis meses. No contiene datos de cuenta, fiscales ni de tu organización.",
+            ],
+          },
+          {
+            id: "analiticas",
+            title: "ANALYTICS · Opcionales",
+            paragraphs: [
+              "Vercel Web Analytics puede medir visitas a páginas generales si lo autorizas y el servicio está habilitado. La integración elimina consultas y fragmentos, y excluye rutas con identificadores y recuperación de contraseña. No enviamos datos fiscales ni propiedades de eventos personalizadas.",
+              "No cargamos el proveedor antes de tu autorización. Puedes retirar el permiso en cualquier momento; los nuevos eventos quedan bloqueados. No usamos publicidad ni marketing.",
+            ],
+          },
+          {
+            id: "eleccion",
+            title: "Cambiar tu elección",
+            paragraphs: [
+              `Versión técnica de preferencias: ${COOKIE_POLICY_VERSION}. Cuando esta versión cambie, volveremos a solicitar tu elección. Rechazar analíticas no limita el uso de ORBIT Nexus.`,
+            ],
+          },
+        ],
+      }}
+    >
+      <CookiePreferencesButton />
+    </LegalPage>
   );
 }

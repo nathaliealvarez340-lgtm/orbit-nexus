@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { addressFields } from "@/lib/fiscal-catalogs";
+import { FormFeedback } from "./form-feedback";
 import type {
   FiscalConfirmation as Confirmation,
   FiscalExtractionResult,
@@ -14,6 +15,7 @@ import {
   issuerCsfTransport,
   fiscalRequest,
   fiscalErrorMessage,
+  FiscalUiError,
   type CsfTransport,
 } from "@/components/fiscal/transport";
 import { FiscalConfirmation } from "@/components/fiscal/fiscal-confirmation";
@@ -60,12 +62,14 @@ export function FiscalForm({
   const [documentBusy, setDocumentBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [failed, setFailed] = useState(false);
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const lock = useRef(false);
   const router = useRouter();
   const change = (field: string, value: string) => {
     setValues((previous) => ({ ...previous, [field]: value }));
     setConfirmed(false);
     setMessage("");
+    setInvalidFields([]);
   };
   const comparisons: FiscalFieldComparison[] = Object.entries(
     sourceValues ?? {},
@@ -89,6 +93,7 @@ export function FiscalForm({
         if (lock.current || readOnly || documentBusy || !confirmed) return;
         if (!values.fiscalRegime || !values.cfdiUse) {
           setFailed(true);
+          setInvalidFields(["fiscalRegime", "cfdiUse"]);
           setMessage(
             "Selecciona el régimen fiscal y el Uso CFDI en sus catálogos.",
           );
@@ -98,6 +103,7 @@ export function FiscalForm({
         setBusy(true);
         setMessage("");
         setFailed(false);
+        setInvalidFields([]);
         try {
           const confirmation: Confirmation = {
             confirmed: true,
@@ -118,6 +124,8 @@ export function FiscalForm({
           router.refresh();
         } catch (failure) {
           setFailed(true);
+          if (failure instanceof FiscalUiError)
+            setInvalidFields(failure.fieldKeys);
           setMessage(
             fiscalErrorMessage(
               failure,
@@ -261,17 +269,12 @@ export function FiscalForm({
           Solo propietarios y administradores pueden actualizar el perfil.
         </p>
       )}
-      {message && (
-        <p
-          role={failed ? "alert" : "status"}
-          className={
-            failed ? "fiscal-error mt-4" : "mt-4 text-sm text-violet-300"
-          }
-        >
-          {failed ? "⚠ " : ""}
-          {message}
-        </p>
-      )}
+      <FormFeedback
+        message={message}
+        error={failed}
+        busy={busy}
+        fields={invalidFields}
+      />
     </form>
   );
 }

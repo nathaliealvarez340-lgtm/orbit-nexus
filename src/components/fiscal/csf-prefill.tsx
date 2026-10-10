@@ -7,6 +7,7 @@ import type {
   PrivateAssetUploadResponse,
 } from "@/types/fiscal-identity";
 import { Button } from "@/components/ui/button";
+import { FormFeedback } from "@/components/forms/form-feedback";
 import { FiscalConsent } from "./fiscal-consent";
 import {
   extractAuthorizedCsf,
@@ -276,11 +277,7 @@ export function CsfPrefill({
             : "Registrando autorización y leyendo el documento…"}
         </p>
       )}
-      {error && (
-        <p role="alert" className="fiscal-error">
-          ⚠ {error}
-        </p>
-      )}
+      <FormFeedback message={error} error={!!error} />
     </section>
   );
 }

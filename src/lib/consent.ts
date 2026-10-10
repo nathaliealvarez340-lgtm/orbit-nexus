@@ -1,21 +1,28 @@
+// Web preferences only. Fiscal consents use their separate backend contract.
+export const COOKIE_POLICY_VERSION = "2";
+export const CONSENT_MAX_AGE = 15552000;
 export type Consent = {
-  version: 1;
+  version: typeof COOKIE_POLICY_VERSION;
   necessary: true;
   analytics: boolean;
-  marketing: boolean;
+  chosenAt: string;
 };
 export function parseConsent(value?: string): Consent | null {
   try {
     const v = JSON.parse(decodeURIComponent(value || ""));
-    return v.version === 1 &&
+    const chosen = Date.parse(v.chosenAt);
+    return v.version === COOKIE_POLICY_VERSION &&
       v.necessary === true &&
       typeof v.analytics === "boolean" &&
-      typeof v.marketing === "boolean"
+      typeof v.chosenAt === "string" &&
+      Number.isFinite(chosen) &&
+      chosen <= Date.now() &&
+      Date.now() - chosen < CONSENT_MAX_AGE * 1000
       ? {
-          version: 1,
+          version: COOKIE_POLICY_VERSION,
           necessary: true,
           analytics: v.analytics,
-          marketing: v.marketing,
+          chosenAt: v.chosenAt,
         }
       : null;
   } catch {

@@ -51,6 +51,7 @@ export class FiscalUiError extends Error {
     public code: string | undefined,
     public status: number,
     public fields: string[] = [],
+    public fieldKeys: string[] = [],
   ) {
     super(
       errorMessages[code ?? ""] ??
@@ -109,6 +110,14 @@ export async function fiscalRequest<T>(
       typeof data?.code === "string" ? data.code : undefined,
       response.status,
       fields,
+      data?.fields && typeof data.fields === "object"
+        ? Object.keys(data.fields).filter(
+            (key) =>
+              Object.hasOwn(fieldLabels, key) &&
+              Array.isArray(data.fields[key]) &&
+              data.fields[key].length,
+          )
+        : [],
     );
   }
   if (!data || typeof data !== "object")

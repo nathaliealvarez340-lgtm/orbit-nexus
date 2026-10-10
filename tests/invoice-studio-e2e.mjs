@@ -101,7 +101,7 @@ try {
     201,
   );
   await page.goto("/dashboard/invoices/new");
-  await page.getByRole("button", { name: "Rechazar no esenciales" }).click();
+  await page.getByRole("button", { name: "Rechazar analíticas" }).click();
   await expect(
     page.getByRole("heading", { name: "Facturas · PRO / MAX" }),
   ).toBeVisible();

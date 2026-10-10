@@ -114,7 +114,7 @@ try {
   const page = await a.context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/dashboard");
-  const reject = page.getByRole("button", { name: "Rechazar no esenciales" });
+  const reject = page.getByRole("button", { name: "Rechazar analíticas" });
   if (await reject.isVisible()) await reject.click();
   for (const path of [
     "/api/clients",

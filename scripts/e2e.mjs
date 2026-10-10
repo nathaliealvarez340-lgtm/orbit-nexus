@@ -122,7 +122,7 @@ try {
   await expect(page).toHaveURL(/\/login/);
   pass("anonymous dashboard redirects to login");
   await page.goto("/register");
-  await page.getByRole("button", { name: "Rechazar no esenciales" }).click();
+  await page.getByRole("button", { name: "Rechazar analíticas" }).click();
   await page.getByLabel("Nombre", { exact: true }).fill("Usuario de prueba A");
   await page.getByLabel("Correo", { exact: true }).fill("orbit-a@example.test");
   await page.getByLabel("Contraseña", { exact: true }).fill("OrbitSecure2026!");
@@ -179,7 +179,10 @@ try {
   });
   const ticketId = page.url().split("/").pop();
   await expect(
-    page.getByText("El OCR aún no está conectado. Completa la información del ticket; los valores no se inventan.", { exact: true }),
+    page.getByText(
+      "El OCR aún no está conectado. Completa la información del ticket; los valores no se inventan.",
+      { exact: true },
+    ),
   ).toBeVisible();
   assert.equal(
     (await query('SELECT COUNT(*)::int AS count FROM "Expense"'))[0].count,
@@ -823,12 +826,15 @@ try {
   );
   await page.getByRole("button", { name: "Preferencias de cookies" }).click();
   await page.getByLabel("Analíticas", { exact: false }).check();
-  await page.getByRole("button", { name: "Guardar preferencias" }).click();
+  await page.getByRole("button", { name: "Aceptar selección" }).click();
   const consent = (await context.cookies()).find(
     (c) => c.name === "orbit.consent",
   );
   assert.equal(JSON.parse(decodeURIComponent(consent.value)).analytics, true);
-  assert.equal(JSON.parse(decodeURIComponent(consent.value)).marketing, false);
+  assert.equal(
+    "marketing" in JSON.parse(decodeURIComponent(consent.value)),
+    false,
+  );
   assert(
     (await context.cookies()).some((c) => c.name.endsWith("session_token")),
   );

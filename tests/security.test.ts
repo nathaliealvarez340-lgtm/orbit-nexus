@@ -99,16 +99,17 @@ test("password and fiscal confirmation are validated", () => {
     }).success,
   );
 });
-test("consent validates individual optional categories and never disables necessary cookies", () => {
+test("consent validates current analytics preferences and never disables necessary cookies", () => {
+  const chosenAt = new Date().toISOString();
   assert.equal(parseConsent("optional"), null);
   assert.equal(
     parseConsent(
       encodeURIComponent(
         JSON.stringify({
-          version: 1,
+          version: "2",
           necessary: false,
           analytics: true,
-          marketing: true,
+          chosenAt: new Date().toISOString(),
         }),
       ),
     ),
@@ -118,14 +119,19 @@ test("consent validates individual optional categories and never disables necess
     parseConsent(
       encodeURIComponent(
         JSON.stringify({
-          version: 1,
+          version: "2",
           necessary: true,
           analytics: false,
-          marketing: true,
+          chosenAt,
         }),
       ),
     ),
-    { version: 1, necessary: true, analytics: false, marketing: true },
+    {
+      version: "2",
+      necessary: true,
+      analytics: false,
+      chosenAt,
+    },
   );
 });
 test("only known merchant aliases resolve to curated portals", () => {

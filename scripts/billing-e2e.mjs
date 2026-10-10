@@ -389,7 +389,7 @@ try {
     "one concurrent preparation; verified autofill; foreign/wrong/expired approval and changed fiscal data blocked; no submit before approval",
   );
   await page.goto(`/dashboard/tickets/${first.id}`);
-  const reject = page.getByRole("button", { name: "Rechazar no esenciales" });
+  const reject = page.getByRole("button", { name: "Rechazar analíticas" });
   if (await reject.isVisible()) await reject.click();
   await expect(
     page.getByRole("heading", { name: "Factura preparada", exact: true }),

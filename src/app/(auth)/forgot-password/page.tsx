@@ -1,5 +1,8 @@
+import { publicMetadata } from "@/lib/web-metadata";
 import Link from "next/link";
 import { RecoveryForm } from "@/components/forms/recovery-form";
+export const metadata = publicMetadata("Recuperar acceso", "/forgot-password");
+
 export default function Page() {
   return (
     <section className="surface p-8">

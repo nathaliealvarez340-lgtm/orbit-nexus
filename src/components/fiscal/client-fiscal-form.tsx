@@ -7,11 +7,13 @@ import type {
 import type { InvoiceFiscalCatalogs } from "@/types/invoice-studio";
 import { addressFields } from "@/lib/fiscal-catalogs";
 import { Button } from "@/components/ui/button";
+import { FormFeedback } from "@/components/forms/form-feedback";
 import { CsfPrefill } from "./csf-prefill";
 import {
   clientCsfTransport,
   fiscalRequest,
   fiscalErrorMessage,
+  FiscalUiError,
 } from "./transport";
 import { FiscalCatalogFields } from "./fiscal-catalog-fields";
 import { FiscalConfirmation } from "./fiscal-confirmation";
@@ -66,6 +68,7 @@ export function ClientFiscalForm({
   const [busy, setBusy] = useState(false);
   const [documentBusy, setDocumentBusy] = useState(false);
   const [error, setError] = useState("");
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const form = useRef<HTMLFormElement>(null);
   const lock = useRef(false);
   useEffect(() => {
@@ -75,6 +78,7 @@ export function ClientFiscalForm({
     setValues((previous) => ({ ...previous, [field]: value }));
     setConfirmed(false);
     setError("");
+    setInvalidFields([]);
   };
   return (
     <form
@@ -85,6 +89,7 @@ export function ClientFiscalForm({
         event.preventDefault();
         if (lock.current || documentBusy || !confirmed) return;
         if (!values.fiscalRegime || !values.cfdiUse) {
+          setInvalidFields(["fiscalRegime", "cfdiUse"]);
           setError(
             "Selecciona el régimen fiscal y el Uso CFDI en sus catálogos.",
           );
@@ -93,6 +98,7 @@ export function ClientFiscalForm({
         lock.current = true;
         setBusy(true);
         setError("");
+        setInvalidFields([]);
         try {
           const confirmation: Confirmation = {
             confirmed: true,
@@ -115,6 +121,8 @@ export function ClientFiscalForm({
           );
           onSaved();
         } catch (failure) {
+          if (failure instanceof FiscalUiError)
+            setInvalidFields(failure.fieldKeys);
           setError(
             fiscalErrorMessage(
               failure,
@@ -269,11 +277,12 @@ export function ClientFiscalForm({
           </Button>
         </div>
       </fieldset>
-      {error && (
-        <p role="alert" className="fiscal-error mt-4">
-          ⚠ {error}
-        </p>
-      )}
+      <FormFeedback
+        message={error}
+        error={!!error}
+        busy={busy}
+        fields={invalidFields}
+      />
     </form>
   );
 }
