@@ -34,6 +34,26 @@ Ningún agente puede modificar silenciosamente este contrato.
 
 
 
+## Especificación autoritativa del CSD (Fase 5C.3)
+
+
+
+`docs/tasks/FASE5C3-CONTRACT.md` es la especificación autoritativa para:
+
+- estados del CSD;
+
+- ciclo de vida del CSD;
+
+- eventos de auditoría del CSD;
+
+- custodia criptográfica del CSD;
+
+- permisos sobre el CSD.
+
+Ante cualquier diferencia en esos temas, prevalece `FASE5C3-CONTRACT.md`. Las secciones §12.4, §13.6 y §25 de este documento remiten a él. El resto del contrato se mantiene sin cambios.
+
+
+
 ---
 
 
@@ -1804,35 +1824,29 @@ Ejemplos conceptuales:
 
 
 
-La configuración debe poder representar estados equivalentes a:
+Especificación autoritativa: `FASE5C3-CONTRACT.md` §C.
 
+Estado efectivo (`CsdStatus`, calculado en cada lectura):
 
+- `NOT_CONFIGURED`: no hay CSD activo;
 
-- `NOT_CONFIGURED`
+- `VALIDATING`: estado local de la UI mientras envía; el backend no lo devuelve;
 
-- `VALIDATING`
+- `VALID`: activo, vigente, RFC igual al del Perfil Fiscal y llave disponible;
 
-- `VALID`
+- `INVALID`: activo pero inutilizable por otra causa (calculado);
 
-- `INVALID`
+- `EXPIRED`: activo y vencido (calculado).
 
-- `EXPIRED`
-
-
+Ciclo de vida persistido: `ACTIVE`, `REPLACED`, `DISABLED`. `EXPIRED` e `INVALID` son estados calculados y nunca se persisten.
 
 La UI puede usar textos más amigables, pero backend conserva la autoridad.
 
-
-
 Solo:
-
-
 
 `VALID`
 
-
-
-puede habilitar un intento real de timbrado.
+permite firmar y puede habilitar un intento real de timbrado.
 
 
 
@@ -2064,21 +2078,21 @@ CSD y material criptográfico nunca deben:
 
 
 
-ActivityLog puede registrar eventos como:
+Especificación autoritativa de los eventos del CSD: `FASE5C3-CONTRACT.md` §Q.
 
+Los eventos del CSD se registran en `AuditEvent` (catálogo de Fase 5C.2), no en ActivityLog:
 
+- `csd.configuration.started`
 
-- `CSD_CONFIGURED`
+- `csd.configured`
 
-- `CSD_REPLACED`
+- `csd.configuration.failed`
 
-- `CSD_VALIDATION_FAILED`
+- `csd.replaced`
 
-- `CSD_EXPIRED`
+- `csd.disabled`
 
-- `STAMP_REQUESTED`
-
-
+El vencimiento no genera un evento: `EXPIRED` es un estado calculado. Los eventos de timbrado (por ejemplo `STAMP_REQUESTED`) se definen en la fase de timbrado (§25).
 
 La auditoría puede guardar:
 
@@ -4006,15 +4020,11 @@ ActivityLog debe registrar eventos relevantes sin almacenar secretos.
 
 
 
-Eventos conceptuales:
+Eventos del CSD: los de `FASE5C3-CONTRACT.md` §Q (`csd.configuration.started`, `csd.configured`, `csd.configuration.failed`, `csd.replaced`, `csd.disabled`), registrados en `AuditEvent`.
+
+Eventos conceptuales de timbrado:
 
 
-
-- `CSD_CONFIGURED`
-
-- `CSD_REPLACED`
-
-- `CSD_VALIDATION_FAILED`
 
 - `CFDI_READY`
 
