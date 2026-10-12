@@ -57,6 +57,8 @@ html { color-scheme: dark; }
 body { background: var(--background); color: var(--foreground); font-family: "Geist", Arial, sans-serif; }
 button, a, label { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
+/* A disabled control must look disabled: otherwise a click that does nothing reads as success. */
+:is(button, .input):disabled { cursor: not-allowed; opacity: .5; }
 
 .surface {
   border: 1px solid rgba(255,255,255,.07);

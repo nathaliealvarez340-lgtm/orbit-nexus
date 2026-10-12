@@ -3,11 +3,14 @@ export function FiscalConfirmation({
   client = false,
   checked,
   onChange,
+  onInvalid,
   disabled = false,
 }: {
   client?: boolean;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  /** Called when the browser blocks a submit because the box is unchecked. */
+  onInvalid?: () => void;
   disabled?: boolean;
 }) {
   return (
@@ -19,6 +22,7 @@ export function FiscalConfirmation({
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
+        onInvalid={onInvalid}
       />
       <span>
         {client

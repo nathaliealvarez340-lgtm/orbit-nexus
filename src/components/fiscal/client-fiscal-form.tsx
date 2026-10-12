@@ -74,6 +74,15 @@ export function ClientFiscalForm({
   useEffect(() => {
     form.current?.querySelector<HTMLInputElement>('input[name="rfc"]')?.focus();
   }, []);
+  // A blocked save always says why: nothing is sent and the form stays open.
+  const unconfirmed = () => {
+    setInvalidFields(["confirmed"]);
+    setError(
+      extraction?.regimes.length && !selectedRegime
+        ? "Selecciona explícitamente un régimen y después confirma los datos para guardar el cliente."
+        : "Marca «Revisé y confirmo que los datos fiscales del cliente son correctos.» para guardar el cliente.",
+    );
+  };
   const change = (field: string, value: string) => {
     setValues((previous) => ({ ...previous, [field]: value }));
     setConfirmed(false);
@@ -87,7 +96,15 @@ export function ClientFiscalForm({
       aria-busy={busy}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (lock.current || documentBusy || !confirmed) return;
+        if (lock.current) return;
+        if (documentBusy) {
+          setError("Espera a que termine la carga o lectura de la constancia.");
+          return;
+        }
+        if (!confirmed) {
+          unconfirmed();
+          return;
+        }
         if (!values.fiscalRegime || !values.cfdiUse) {
           setInvalidFields(["fiscalRegime", "cfdiUse"]);
           setError(
@@ -260,7 +277,16 @@ export function ClientFiscalForm({
         <FiscalConfirmation
           client
           checked={confirmed}
-          onChange={setConfirmed}
+          // The browser blocks a submit while this required box is unchecked; the reason
+          // also stays on the page, not only in the transient native bubble.
+          onInvalid={unconfirmed}
+          onChange={(checked) => {
+            setConfirmed(checked);
+            if (checked) {
+              setError("");
+              setInvalidFields([]);
+            }
+          }}
           disabled={!!extraction?.regimes.length && !selectedRegime}
         />
         {!!extraction?.regimes.length && !selectedRegime && (
@@ -269,7 +295,7 @@ export function ClientFiscalForm({
           </p>
         )}
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="submit" disabled={!confirmed}>
+          <Button type="submit">
             {busy ? "Guardando…" : "Guardar cliente"}
           </Button>
           <Button variant="secondary" onClick={onCancel}>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type {
   FiscalConsentPurpose,
   FiscalConsentTerms,
@@ -46,6 +46,7 @@ export function CsfPrefill({
   const [termsLoading, setTermsLoading] = useState(!!transport.terms);
   const [unavailable, setUnavailable] = useState(false);
   const lock = useRef(false);
+  const savedFirstId = useId();
   useEffect(() => {
     if (!transport.terms) return;
     const controller = new AbortController();
@@ -100,6 +101,7 @@ export function CsfPrefill({
           className="input mt-2"
           type="file"
           accept=".pdf,application/pdf"
+          aria-describedby={client && !clientId ? savedFirstId : undefined}
           disabled={
             disabled ||
             unavailable ||
@@ -140,6 +142,12 @@ export function CsfPrefill({
           }}
         />
       </label>
+      {client && !clientId && (
+        <p id={savedFirstId} className="fiscal-pending">
+          Guarda primero el cliente. Después podrás editarlo y cargar su
+          constancia opcional.
+        </p>
+      )}
       {document && (
         <p className="fiscal-help">
           Documento privado: {document.fileName} ·{" "}
@@ -181,12 +189,6 @@ export function CsfPrefill({
           Aviso de Privacidad sin versión publicada. El backend permite pruebas
           locales y bloquea el procesamiento productivo sin aviso vigente. Esta
           operación no representa aprobación para producción.
-        </p>
-      )}
-      {client && !clientId && (
-        <p className="fiscal-help">
-          Guarda primero el cliente. Después podrás editarlo y cargar su
-          constancia opcional.
         </p>
       )}
       <Button
