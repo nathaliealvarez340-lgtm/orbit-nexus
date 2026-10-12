@@ -4,12 +4,14 @@ import { isSecretKey, redactText } from "./security/redact";
 // Fase 5C.2 §6: catalog of security audit events. Each action fixes its scope, target
 // type and the only metadata keys it may keep. TENANT events need the Organization
 // resolved by the server; ACCOUNT events belong to the actor and have none.
-// Reserved actions document the CSD/stamping events of a later phase: they cannot be
+// Reserved actions document the stamping events of a later phase: they cannot be
 // recorded until that phase defines and implements them.
 type AuditDefinition = {
   scope: "TENANT" | "ACCOUNT";
   targetType: string;
   metadata: readonly string[];
+  /** Metadata keys holding a server-generated UUID, kept verbatim (never redacted text). */
+  identifiers?: readonly string[];
   reserved?: true;
 };
 export const auditCatalog = {
@@ -58,17 +60,32 @@ export const auditCatalog = {
     targetType: "Document",
     metadata: ["kind", "reason"],
   },
+  // Fase 5C.3 §Q. Never the RFC, password, key, file contents or cryptographic material.
+  "csd.configuration.started": {
+    scope: "TENANT",
+    targetType: "CsdCertificate",
+    metadata: ["replace", "reason"],
+  },
   "csd.configured": {
     scope: "TENANT",
     targetType: "CsdCertificate",
-    metadata: [],
-    reserved: true,
+    metadata: ["certificateNumber", "environment", "validTo", "created"],
   },
-  "csd.revoked": {
+  "csd.configuration.failed": {
     scope: "TENANT",
     targetType: "CsdCertificate",
-    metadata: [],
-    reserved: true,
+    metadata: ["errorCode", "stage"],
+  },
+  "csd.replaced": {
+    scope: "TENANT",
+    targetType: "CsdCertificate",
+    metadata: ["previousCertificateId", "certificateNumber"],
+    identifiers: ["previousCertificateId"],
+  },
+  "csd.disabled": {
+    scope: "TENANT",
+    targetType: "CsdCertificate",
+    metadata: ["certificateNumber", "reason"],
   },
   "invoice.stamp_authorized": {
     scope: "TENANT",
@@ -106,6 +123,8 @@ export type AuditEventInput = {
 export class AuditError extends Error {}
 
 const maxMetadataBytes = 2048;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 /**
  * Keeps only the catalog's metadata keys, with bounded scalar values or short string
  * lists, redacted: no document, payload or secret fits. Secret keys are rejected even
@@ -115,11 +134,15 @@ export function sanitizeAuditMetadata(
   action: AuditAction,
   metadata: AuditEventInput["metadata"],
 ): Prisma.InputJsonObject | undefined {
-  const allowed: readonly string[] = auditCatalog[action].metadata;
+  const definition: AuditDefinition = auditCatalog[action];
+  const allowed = definition.metadata;
   const output: Record<string, string | number | boolean | string[]> = {};
   for (const [key, value] of Object.entries(metadata ?? {})) {
     if (!allowed.includes(key) || isSecretKey(key)) continue;
-    if (typeof value === "string") output[key] = redactText(value, 120);
+    if (definition.identifiers?.includes(key)) {
+      if (typeof value === "string" && uuidPattern.test(value))
+        output[key] = value;
+    } else if (typeof value === "string") output[key] = redactText(value, 120);
     else if (typeof value === "number" && Number.isFinite(value))
       output[key] = value;
     else if (typeof value === "boolean") output[key] = value;

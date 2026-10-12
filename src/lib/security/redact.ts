@@ -1,9 +1,10 @@
 // Fase 5C.2 §7: central redaction for anything that leaves the request boundary as a log
 // line, audit metadata or diagnostic. Values are dropped or masked, never echoed.
 
-// Key names whose values are never kept, whatever their content.
+// Key names whose values are never kept, whatever their content. Fase 5C.3 §R adds the
+// CSD envelope: wrapped data keys, KEK references, ciphertext, IV and GCM tags.
 const secretKey =
-  /pass(word)?|secret|token|authorization|cookie|session|api[-_]?key|private[-_]?key|credential|signature|otp|verification|reset|\bcode$|cer(tificate)?$|\bkey$|csd|e\.?firma|(^|[-_])fiel($|[-_])/i;
+  /pass(word)?|secret|token|authorization|cookie|session|api[-_]?key|private[-_]?key|credential|signature|otp|verification|reset|\bcode$|cer(tificate)?$|\bkey$|csd|e\.?firma|(^|[-_])fiel($|[-_])|wrapped|dek$|^kek|cipher|auth[-_]?tag|^iv$/i;
 // Key names that carry fiscal documents or payloads.
 const payloadKey =
   /xml|content|bytes|raw|ocr|payload|snapshot|document|csf|constancia|pdf|image|body|fields|regimes/i;
@@ -16,6 +17,9 @@ const patterns: [RegExp, string][] = [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
     "[private-key]",
   ],
+  // Any other PEM block (certificates, encrypted keys, CSR), complete or cut off: §R.
+  [/-----BEGIN [A-Z0-9 ]+-----[\s\S]*?-----END [A-Z0-9 ]+-----/g, "[pem]"],
+  [/-----BEGIN [A-Z0-9 ]+-----[\s\S]*/g, "[pem]"],
   [/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]"],
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "[jwt]"],
   [/\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:[^\s@/]+@/gi, "[credentials]@"],

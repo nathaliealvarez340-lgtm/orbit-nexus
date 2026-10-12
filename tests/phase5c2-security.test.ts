@@ -578,16 +578,29 @@ test("audit scope rules: tenant events need the Organization, account events hav
   );
   await assert.rejects(record("legal.accepted", "org"), /HAS_NO_ORGANIZATION/);
   for (const action of [
-    "csd.configured",
-    "csd.revoked",
     "invoice.stamp_authorized",
     "invoice.stamped",
     "invoice.cancelled",
   ] as AuditAction[])
     await assert.rejects(record(action, "org"), /AUDIT_ACTION_RESERVED/);
+  // Fase 5C.3 §Q: CSD events are defined (csd.disabled replaces the reserved csd.revoked).
+  await assert.rejects(
+    record("csd.revoked" as AuditAction, "org"),
+    /AUDIT_ACTION_UNKNOWN/,
+  );
+  for (const action of [
+    "csd.configuration.started",
+    "csd.configured",
+    "csd.configuration.failed",
+    "csd.replaced",
+    "csd.disabled",
+  ] as AuditAction[]) {
+    await assert.rejects(record(action, null), /ORGANIZATION_REQUIRED/);
+    await record(action, "org");
+  }
   await record("legal.accepted", null);
   await record("sensitive_asset.uploaded", "org");
-  assert.equal(writes.length, 2);
+  assert.equal(writes.length, 7);
 });
 
 // --- Consent invariants ---------------------------------------------------------------
