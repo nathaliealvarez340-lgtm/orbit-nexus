@@ -99,3 +99,5 @@ dev-server.log
 /.orbit-local/
 /test-results/
 /playwright-report/
+
+.playwright-mcp/
