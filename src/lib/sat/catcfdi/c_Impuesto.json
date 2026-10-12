@@ -1,0 +1,36 @@
+{
+  "catalogVersion": "1",
+  "catalogRevision": "0",
+  "publishedOn": null,
+  "validFrom": "2022-01-01",
+  "validTo": null,
+  "entries": [
+    {
+      "code": "001",
+      "description": "ISR",
+      "withholding": true,
+      "transfer": false,
+      "scope": "Federal",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "002",
+      "description": "IVA",
+      "withholding": true,
+      "transfer": true,
+      "scope": "Federal",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "003",
+      "description": "IEPS",
+      "withholding": true,
+      "transfer": true,
+      "scope": "Federal",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    }
+  ]
+}

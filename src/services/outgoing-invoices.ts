@@ -29,6 +29,11 @@ import {
 } from "@/lib/sat-catalogs";
 import { largeCatalogSources } from "@/lib/sat-catalogs-large";
 import { postalCodeIndex } from "@/lib/sat/postal-codes";
+import { checkCfdi40Content } from "@/lib/cfdi40/build";
+import { loadCfdi40Catalogs, type Cfdi40Catalogs } from "@/lib/cfdi40/catalogs";
+import { orbitInvoiceForCfdi } from "@/lib/cfdi40/orbit-invoice";
+import { cfdi40ReadinessIssues } from "@/lib/cfdi40/readiness";
+import type { OrbitInvoiceForCfdi } from "@/lib/cfdi40/types";
 import type {
   Client,
   FiscalProfile,
@@ -244,6 +249,7 @@ type DraftRefs = {
   inactiveSaved: Set<string>;
   missingSaved: Set<string>;
   postalCodes: PostalCodeLookup;
+  catalogs: Cfdi40Catalogs;
 };
 type PostalCodeLookup = { has(code: string): boolean };
 async function loadDraftRefs(
@@ -278,9 +284,23 @@ async function loadDraftRefs(
     inactiveSaved: new Set(saved.filter((s) => !s.active).map((s) => s.id)),
     missingSaved: new Set(savedIds.filter((id) => !found.has(id))),
     postalCodes: await postalCodeIndex(),
+    catalogs: await loadCfdi40Catalogs(),
   };
 }
 
+// READY means "fiscal content the CFDI 4.0 builder accepts" (Fase 5C.4). Once ORBIT's own
+// rules pass, the same mapper, normalizer, validator and serializer as the CFDI builder run
+// in CONTENT mode (official catalogs, no curated subsets), so no rule is duplicated here
+// and no invoice can be READY if the current CFDI 4.0 contract would reject it. The
+// emission build re-checks everything, plus status and issue date, at its own instant.
+function cfdiContentIssues(
+  cfdi: OrbitInvoiceForCfdi,
+  catalogs: Cfdi40Catalogs,
+): InvoiceValidationIssue[] {
+  return cfdi40ReadinessIssues(
+    checkCfdi40Content(cfdi, { at: new Date(), catalogs }),
+  );
+}
 function evaluate(
   data: InvoiceDraftInput,
   issuer: (RuleParty & { profileComplete: boolean }) | null,
@@ -289,24 +309,29 @@ function evaluate(
   inactiveSaved: ReadonlySet<string>,
   postalCodes: PostalCodeLookup,
   extra: InvoiceValidationIssue[] = [],
+  cfdi?: { invoice: OrbitInvoiceForCfdi; catalogs: Cfdi40Catalogs },
 ): InvoiceValidationResult {
-  return buildValidationResult(
-    [
-      ...validateInvoiceRules({
-        issuer,
-        receiver,
-        draft: data,
-        totals,
-        today: mexicoToday(),
-        isKnownProductCode: largeCatalogSources["product-services"].has,
-        isKnownUnitCode: largeCatalogSources.units.has,
-        isKnownPostalCode: (code) => postalCodes.has(code),
-        inactiveSavedConceptIds: inactiveSaved,
-      }),
-      ...extra,
-    ],
-    data.documentType,
-  );
+  const issues = [
+    ...validateInvoiceRules({
+      issuer,
+      receiver,
+      draft: data,
+      totals,
+      today: mexicoToday(),
+      isKnownProductCode: largeCatalogSources["product-services"].has,
+      isKnownUnitCode: largeCatalogSources.units.has,
+      isKnownPostalCode: (code) => postalCodes.has(code),
+      inactiveSavedConceptIds: inactiveSaved,
+    }),
+    ...extra,
+  ];
+  if (
+    cfdi &&
+    data.documentType === "I" &&
+    !issues.some((issue) => issue.severity === "ERROR")
+  )
+    issues.push(...cfdiContentIssues(cfdi.invoice, cfdi.catalogs));
+  return buildValidationResult(issues, data.documentType);
 }
 function evaluateDraft(
   data: InvoiceDraftInput,
@@ -327,6 +352,12 @@ function evaluateDraft(
     refs.inactiveSaved,
     refs.postalCodes,
     extra,
+    refs.profile && refs.client
+      ? {
+          invoice: draftForCfdi(data, refs.profile, refs.client, totals),
+          catalogs: refs.catalogs,
+        }
+      : undefined,
   );
 }
 
@@ -398,6 +429,65 @@ function conceptRows(data: InvoiceDraftInput, totals: CalculatedInvoiceTotals) {
       total: line.total.toFixed(2),
     };
   });
+}
+
+// The CFDI 4.0 view of a draft exactly as draftFields/conceptRows would store it. It is
+// saved by the Fase 5 rules, so it is never a legacy record; the folio is checked when the
+// stored invoice is marked READY.
+function draftForCfdi(
+  data: InvoiceDraftInput,
+  profile: FiscalProfile,
+  client: Client,
+  totals: CalculatedInvoiceTotals,
+): OrbitInvoiceForCfdi {
+  return {
+    id: "",
+    organizationId: profile.organizationId,
+    status: "DRAFT",
+    version: 0,
+    folio: null,
+    invoiceDate: data.invoiceDate,
+    documentType: data.documentType,
+    currency: data.currency,
+    exchangeRate: data.exchangeRate ?? null,
+    cfdiUse: data.cfdiUse,
+    paymentMethod: data.paymentMethod ?? null,
+    paymentForm: data.paymentForm ?? null,
+    exportCode: data.exportCode,
+    legacyRecord: false,
+    issuerSnapshot: issuerSnapshot(profile),
+    receiverSnapshot: receiverSnapshot(client),
+    totals: {
+      subtotal: totals.subtotal.toFixed(2),
+      discount: totals.discount.toFixed(2),
+      transferred: totals.transferredTaxes.toFixed(2),
+      withheldVat: totals.withheldVat.toFixed(2),
+      withheldIsr: totals.withheldIsr.toFixed(2),
+      total: totals.total.toFixed(2),
+    },
+    concepts: conceptRows(data, totals).map((row) => ({
+      position: row.position,
+      description: row.description,
+      productCode: row.productCode,
+      unitCode: row.unitCode,
+      quantity: row.quantity,
+      unitPrice: row.unitPrice,
+      discount: row.discount,
+      taxObject: row.taxObject,
+      vatFactor: row.vatFactor,
+      vatRate: row.vatRate,
+      appliedVatRate: row.taxRate,
+      withholdingVatRate: row.withholdingVatRate,
+      withholdingIsrRate: row.withholdingIsrRate,
+      totals: {
+        amount: row.subtotal,
+        discount: row.discount,
+        transferred: row.transferredTaxes,
+        withheldVat: row.withheldVat,
+        withheldIsr: row.withheldIsr,
+      },
+    })),
+  };
 }
 
 function storedConcept(c: StampedInvoiceConcept): InvoiceDraftConcept {
@@ -533,6 +623,11 @@ async function validateStoredInvoice(
     new Set(inactive.map((s) => s.id)),
     await postalCodeIndex(),
     extra,
+    // The stored record itself: snapshots, amounts and the legacy marker (validation null).
+    {
+      invoice: orbitInvoiceForCfdi(invoice),
+      catalogs: await loadCfdi40Catalogs(),
+    },
   );
 }
 

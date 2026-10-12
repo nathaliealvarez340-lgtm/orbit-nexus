@@ -1,0 +1,57 @@
+{
+  "catalogVersion": "4",
+  "catalogRevision": "0",
+  "publishedOn": "2024-12-13",
+  "validFrom": "2022-01-01",
+  "validTo": null,
+  "entries": [
+    {
+      "code": "01",
+      "description": "No objeto de impuesto.",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "02",
+      "description": "Sí objeto de impuesto.",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "03",
+      "description": "Sí objeto del impuesto y no obligado al desglose.",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "04",
+      "description": "Sí objeto del impuesto y no causa impuesto.",
+      "validFrom": "2022-10-07",
+      "validTo": null
+    },
+    {
+      "code": "05",
+      "description": "Sí objeto del impuesto, IVA crédito PODEBI.",
+      "validFrom": "2023-12-06",
+      "validTo": null
+    },
+    {
+      "code": "06",
+      "description": "Sí objeto del IVA, No traslado IVA.",
+      "validFrom": "2024-12-13",
+      "validTo": null
+    },
+    {
+      "code": "07",
+      "description": "No traslado del IVA, Sí desglose IEPS.",
+      "validFrom": "2024-12-13",
+      "validTo": null
+    },
+    {
+      "code": "08",
+      "description": "No traslado del IVA, No desglose IEPS.",
+      "validFrom": "2024-12-13",
+      "validTo": null
+    }
+  ]
+}

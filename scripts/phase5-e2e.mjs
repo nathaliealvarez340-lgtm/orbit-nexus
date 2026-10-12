@@ -139,7 +139,7 @@ try {
 
   // --- Tenant setup: complete issuer for A, incomplete issuer for B ------------------
   const clientData = {
-    rfc: "BBB010101BBB",
+    rfc: "BBB010101BB1",
     legalName: "Cliente Fase Cinco",
     personType: "COMPANY",
     fiscalRegime: "601",
@@ -157,7 +157,7 @@ try {
   };
   const client = await json(await post(a.ctx, "/api/clients", clientData), 201);
   const clientB = await json(
-    await post(b.ctx, "/api/clients", { ...clientData, rfc: "CCC010101CCC" }),
+    await post(b.ctx, "/api/clients", { ...clientData, rfc: "CCC010101CC1" }),
     201,
   );
   const fiscal = {
@@ -189,7 +189,7 @@ try {
   await json(
     await post(b.ctx, "/api/fiscal-profile", {
       ...fiscal,
-      rfc: "DDD010101DDD",
+      rfc: "DDD010101DD1",
     }),
   );
   const logoPng = await sharp({

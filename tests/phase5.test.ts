@@ -297,6 +297,32 @@ function rules(
 }
 const codes = (r: ReturnType<typeof rules>) => r.issues.map((i) => i.code);
 
+test("an unselected tax object or export code stays unselected and blocks READY (Fase 5C.4)", () => {
+  // Invoice Studio sends "" until the user chooses; it is never replaced by 02 or 01.
+  const parsed = draftSchema.parse({
+    ...request,
+    exportCode: "",
+    concepts: [{ ...concept, taxObject: "", vatRate: undefined }],
+  });
+  assert.deepEqual([parsed.exportCode, parsed.concepts[0].taxObject], ["", ""]);
+  const r = rules({
+    exportCode: "",
+    concepts: [concept, { ...concept, taxObject: "", vatRate: undefined }],
+  });
+  assert.deepEqual(codes(r), [
+    "EXPORT_CODE_REQUIRED",
+    "CONCEPT_TAX_OBJECT_REQUIRED",
+  ]);
+  assert.equal(r.issues[1].conceptIndex, 1);
+  assert.equal(r.issues[1].field, "taxObject");
+  assert.equal(r.canMarkReady, false);
+  // Without a tax object no tax is computed: totals never assume ObjetoImp 02.
+  assert.equal(
+    calculateInvoiceTotals(parsed.concepts).transferredTaxes.toFixed(2),
+    "0.00",
+  );
+});
+
 test("a complete Ingreso draft is valid and can become READY", () => {
   const r = rules();
   assert.deepEqual(r.issues, []);

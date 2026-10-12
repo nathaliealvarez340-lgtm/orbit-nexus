@@ -124,6 +124,14 @@ const withholdingIsrRate = rateText("Tasa de retención de ISR inválida");
 
 // Phase 3 clients sent `taxRate` and omitted taxObject/vatFactor/exportCode; those
 // payloads keep working until Invoice Studio replaces the form (contract §36).
+// Fase 5C.4: only an omitted (undefined/null) taxObject or exportCode takes that legacy
+// default. Invoice Studio sends "" for "not selected yet"; it is stored as "" and blocks
+// READY, so no default can become a CFDI value the user never chose.
+const unselected = <T extends z.ZodType<string>>(schema: T, legacy: string) =>
+  z.preprocess(
+    (v) => (v === "" ? "" : (absent(v) ?? legacy)),
+    z.union([z.literal(""), schema]),
+  );
 export const draftConceptSchema = z.preprocess(
   (v) =>
     v &&
@@ -153,7 +161,7 @@ export const draftConceptSchema = z.preprocess(
       absent,
       decimalText(10, 2, "Descuento válido con hasta 2 decimales").optional(),
     ),
-    taxObject: z.preprocess((v) => absent(v) ?? "02", taxObject),
+    taxObject: unselected(taxObject, "02"),
     vatFactor: z.preprocess((v) => absent(v) ?? "TASA", vatFactor),
     vatRate,
     withholdingVatRate,
@@ -184,12 +192,12 @@ export const draftSchema = z.object({
     z.enum(["PUE", "PPD"], { error: "Selecciona PUE o PPD" }).optional(),
   ),
   paymentForm: z.preprocess(absent, paymentFormSchema.optional()),
-  exportCode: z.preprocess(
-    (v) => absent(v) ?? "01",
+  exportCode: unselected(
     catalogCode(
       catalogCodes.exportCode,
       "Selecciona una clave de exportación del catálogo",
     ),
+    "01",
   ),
   concepts: z
     .array(draftConceptSchema, { error: "Agrega al menos un concepto" })

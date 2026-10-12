@@ -452,7 +452,14 @@ export function validateInvoiceRules(
       "El tipo de cambio debe ser mayor que cero.",
       { field: "exchangeRate" },
     );
-  if (!catalogOption(exportCodeCatalog, draft.exportCode)?.active)
+  if (!draft.exportCode)
+    error(
+      "document",
+      "EXPORT_CODE_REQUIRED",
+      "Selecciona la clave de exportación de la factura.",
+      { field: "exportCode" },
+    );
+  else if (!catalogOption(exportCodeCatalog, draft.exportCode)?.active)
     error(
       "document",
       "EXPORT_CODE_NOT_SUPPORTED",
@@ -560,6 +567,16 @@ export function validateInvoiceRules(
         "El concepto guardado de origen está desactivado; la línea conserva sus datos.",
         at("savedConceptId"),
       );
+    // Never assumed: an unselected objeto de impuesto blocks READY (Fase 5C.4).
+    if (!c.taxObject) {
+      error(
+        "concepts",
+        "CONCEPT_TAX_OBJECT_REQUIRED",
+        "Selecciona el objeto de impuesto del concepto.",
+        at("taxObject"),
+      );
+      return;
+    }
     if (!catalogOption(taxObjectCatalog, c.taxObject)?.active) {
       error(
         "concepts",

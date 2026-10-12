@@ -1,0 +1,21 @@
+{
+  "catalogVersion": "1",
+  "catalogRevision": "0",
+  "publishedOn": null,
+  "validFrom": "2022-01-01",
+  "validTo": null,
+  "entries": [
+    {
+      "code": "PUE",
+      "description": "Pago en una sola exhibición",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "PPD",
+      "description": "Pago en parcialidades o diferido",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    }
+  ]
+}

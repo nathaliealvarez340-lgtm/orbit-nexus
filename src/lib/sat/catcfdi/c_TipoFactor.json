@@ -1,0 +1,24 @@
+{
+  "catalogVersion": "1",
+  "catalogRevision": "0",
+  "publishedOn": null,
+  "validFrom": "2022-01-01",
+  "validTo": null,
+  "entries": [
+    {
+      "code": "Tasa",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "Cuota",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "Exento",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    }
+  ]
+}

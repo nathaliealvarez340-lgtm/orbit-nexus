@@ -1,0 +1,44 @@
+{
+  "catalogVersion": "1",
+  "catalogRevision": "0",
+  "publishedOn": null,
+  "validFrom": "2022-01-01",
+  "validTo": null,
+  "entries": [
+    {
+      "code": "I",
+      "description": "Ingreso",
+      "maxValue": "999999999999999999.999999",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "E",
+      "description": "Egreso",
+      "maxValue": "999999999999999999.999999",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "T",
+      "description": "Traslado",
+      "maxValue": "0",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "N",
+      "description": "Nómina",
+      "maxValue": null,
+      "validFrom": "2022-01-01",
+      "validTo": null
+    },
+    {
+      "code": "P",
+      "description": "Pago",
+      "maxValue": "999999999999999999.999999",
+      "validFrom": "2022-01-01",
+      "validTo": null
+    }
+  ]
+}

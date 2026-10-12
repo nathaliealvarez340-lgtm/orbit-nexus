@@ -112,7 +112,7 @@ try {
     [org.id, "PRO"],
   );
   const party = {
-    rfc: "BBB010101BBB",
+    rfc: "BBB010101BB1",
     legalName: "Cliente de prueba",
     personType: "COMPANY",
     fiscalRegime: "601",
@@ -206,7 +206,7 @@ try {
   await page.keyboard.press("Enter");
   await expect(
     page.getByLabel("Cliente receptor", { exact: true }),
-  ).toHaveValue("Cliente de prueba · BBB010101BBB");
+  ).toHaveValue("Cliente de prueba · BBB010101BB1");
   await expect(page.getByLabel("Forma de pago", { exact: true })).toHaveValue(
     /03/,
   );
@@ -279,6 +279,7 @@ try {
   pass(
     "real SAT search uses canonical identifiers and discloses curated coverage",
   );
+  await page.getByLabel("Exportación", { exact: true }).selectOption("01");
   await page.getByLabel("Método de pago", { exact: true }).selectOption("PPD");
   await page
     .getByRole("button", { name: "Validar datos", exact: true })
