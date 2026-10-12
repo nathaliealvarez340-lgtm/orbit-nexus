@@ -1,7 +1,10 @@
 import { LegalPage } from "@/components/privacy/legal-page";
-import { legalContent } from "@/lib/legal-content";
-import { publicMetadata } from "@/lib/web-metadata";
-export const metadata = publicMetadata("Aviso de Privacidad", "/privacy");
+import { currentLegalDocument } from "@/lib/legal/registry";
+import { legalMetadata } from "@/lib/legal-web";
+export const metadata = legalMetadata(
+  currentLegalDocument("PRIVACY_NOTICE"),
+  "/privacy",
+);
 export default function Page() {
-  return <LegalPage content={legalContent.privacy} />;
+  return <LegalPage document={currentLegalDocument("PRIVACY_NOTICE")} />;
 }

@@ -645,7 +645,7 @@ try {
     404,
   );
   await page
-    .getByLabel("Revisé y confirmo los datos fiscales de esta organización.", {
+    .getByLabel("Revisé y confirmo que mis datos fiscales son correctos.", {
       exact: true,
     })
     .check();
@@ -655,7 +655,7 @@ try {
   await expect(
     page
       .getByRole("status")
-      .filter({ hasText: "Perfil fiscal confirmado y guardado." }),
+      .filter({ hasText: "✓ Información guardada correctamente" }),
   ).toBeVisible();
   assert.equal(
     (

@@ -6,6 +6,7 @@ import { chromium } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
 import { startDatabase } from "../scripts/local-database.mjs";
 import { webPrivacyChecks } from "./web-privacy-checks.mjs";
+import { legalReconciliationChecks } from "./legal-reconciliation-checks.mjs";
 
 // Actual app/API scenarios use only ephemeral PGlite and synthetic local data.
 const database = await startDatabase();
@@ -135,6 +136,7 @@ try {
   );
   page.on("pageerror", (error) => errors.push(error.message));
   await webPrivacyChecks({ page, context, pass });
+  await legalReconciliationChecks({ page, context, database, pass });
   assert.deepEqual(errors, []);
   await writeFile(
     "test-results/web-privacy-e2e-summary.json",

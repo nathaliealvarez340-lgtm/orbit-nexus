@@ -10,12 +10,16 @@ function beforeSend(event: BeforeSendEvent) {
     location.origin,
   );
 }
-export function ProductAnalytics() {
+export function ProductAnalytics({
+  enabled = process.env.NEXT_PUBLIC_VERCEL_ANALYTICS_ENABLED === "true",
+}: {
+  enabled?: boolean;
+}) {
   const consent = useWebConsent(),
     path = analyticsPath(usePathname());
   // Explicit route disables SDK automatic tracking. Only safe paths are supplied.
   // beforeSend reads the cookie at send time even after unmount/revocation.
-  return consent?.analytics && path ? (
+  return enabled && consent?.analytics && path ? (
     <Analytics
       framework="next"
       mode="production"

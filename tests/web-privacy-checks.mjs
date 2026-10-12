@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { build } from "esbuild";
 
 export async function webPrivacyChecks({ page, context, pass }) {
   const requests = [];
@@ -25,6 +26,50 @@ export async function webPrivacyChecks({ page, context, pass }) {
     }),
   );
   await context.clearCookies({ name: "orbit.consent" });
+  // Activation is off in the real app. This explicitly enabled, isolated component
+  // harness verifies the installed SDK against the app's actual production CSP.
+  const analyticsFixture = await context.newPage();
+  analyticsFixture.on("request", (r) => {
+    if (r.url().includes("/_vercel/insights")) requests.push(r.url());
+  });
+  const csp = (await context.request.get("/privacy")).headers()[
+    "content-security-policy"
+  ];
+  await context.route("**/__analytics-fixture", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      headers: { "Content-Security-Policy": csp },
+      body: '<html lang="es"><head><title>Prueba aislada de SDK</title></head><body><div id="root"></div></body></html>',
+    }),
+  );
+  await analyticsFixture.goto("/__analytics-fixture");
+  const bundle = await build({
+    stdin: {
+      contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ProductAnalytics} from './src/components/privacy/product-analytics'; createRoot(document.getElementById('root')).render(<ProductAnalytics enabled={true}/>);`,
+      resolveDir: process.cwd(),
+      loader: "tsx",
+    },
+    bundle: true,
+    write: false,
+    platform: "browser",
+    jsx: "automatic",
+    define: { "process.env.NODE_ENV": '"production"' },
+    plugins: [
+      {
+        name: "isolated-analytics-path",
+        setup(builder) {
+          builder.onResolve({ filter: /^next\/navigation$/ }, () => ({
+            path: "next/navigation",
+            namespace: "fixture",
+          }));
+          builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({
+            contents: "export const usePathname = () => '/privacy';",
+          }));
+        },
+      },
+    ],
+  });
+  await analyticsFixture.addScriptTag({ content: bundle.outputFiles[0].text });
   await page.goto("/privacy");
   await expect(
     page.getByRole("heading", { name: "Aviso de Privacidad", exact: true }),
@@ -49,6 +94,14 @@ export async function webPrivacyChecks({ page, context, pass }) {
   ).not.toBeChecked();
   await page.getByRole("checkbox", { name: /ANALYTICS/ }).check();
   await page.getByRole("button", { name: "Aceptar selección" }).click();
+  assert.equal(
+    await page.locator('script[src*="/_vercel/insights"]').count(),
+    0,
+    "Pending activation must not load the provider in the app",
+  );
+  await analyticsFixture.evaluate(() =>
+    window.dispatchEvent(new Event("focus")),
+  );
   await expect.poll(() => requests.length).toBe(1);
   const consent = JSON.parse(
     decodeURIComponent(
@@ -66,9 +119,11 @@ export async function webPrivacyChecks({ page, context, pass }) {
   assert.equal(consent.version, "2");
   assert(Number.isFinite(Date.parse(consent.chosenAt)));
   await expect
-    .poll(() => page.evaluate(() => window.privacyAnalytics?.events.length))
+    .poll(() =>
+      analyticsFixture.evaluate(() => window.privacyAnalytics?.events.length),
+    )
     .toBe(1);
-  const payload = await page.evaluate(() =>
+  const payload = await analyticsFixture.evaluate(() =>
     window.privacyAnalytics.beforeSend({
       type: "pageview",
       url: location.origin + "/dashboard/reports?invoiceId=private#rfc",
@@ -80,7 +135,7 @@ export async function webPrivacyChecks({ page, context, pass }) {
     url: new URL("/dashboard/reports", page.url()).href,
   });
   assert.equal(
-    await page.evaluate(() =>
+    await analyticsFixture.evaluate(() =>
       window.privacyAnalytics.beforeSend({
         type: "pageview",
         url: location.origin + "/reset-password?token=private",
@@ -89,7 +144,7 @@ export async function webPrivacyChecks({ page, context, pass }) {
     null,
   );
   assert.equal(
-    await page.evaluate(() =>
+    await analyticsFixture.evaluate(() =>
       window.privacyAnalytics.beforeSend({ type: "event", url: location.href }),
     ),
     null,
@@ -102,7 +157,7 @@ export async function webPrivacyChecks({ page, context, pass }) {
     .getByRole("button", { name: "Rechazar analíticas", exact: true })
     .click();
   assert.equal(
-    await page.evaluate(() =>
+    await analyticsFixture.evaluate(() =>
       window.privacyAnalytics.beforeSend({
         type: "pageview",
         url: location.origin + "/privacy",
@@ -111,6 +166,8 @@ export async function webPrivacyChecks({ page, context, pass }) {
     null,
     "Already loaded SDK must not send after revocation",
   );
+  await analyticsFixture.close();
+  await context.unroute("**/__analytics-fixture");
   pass(
     "web consent: zero pre-choice/rejected requests, persistence, explicit opt-in, safe payload and immediate revocation of loaded SDK",
   );
@@ -158,7 +215,7 @@ export async function webPrivacyChecks({ page, context, pass }) {
     ["/register", "Crear cuenta"],
     ["/forgot-password", "Recuperar acceso"],
     ["/privacy", "Aviso de Privacidad"],
-    ["/terms", "Términos del servicio"],
+    ["/terms", "Términos y Condiciones"],
     ["/cookies", "Cookies y preferencias"],
   ]) {
     await page.goto(path);
@@ -169,6 +226,17 @@ export async function webPrivacyChecks({ page, context, pass }) {
       path,
     );
     assert(await page.locator('meta[property="og:title"]').count());
+    if (["/privacy", "/terms"].includes(path)) {
+      assert(
+        (
+          await page.locator('meta[name="robots"]').getAttribute("content")
+        ).includes("noindex"),
+      );
+      await expect(page.locator('[data-legal-status="DRAFT"]')).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Registrar mi aceptación" }),
+      ).toHaveCount(0);
+    }
     if (path !== "/") {
       const axe = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -185,8 +253,12 @@ export async function webPrivacyChecks({ page, context, pass }) {
     }
   }
   const sitemap = await (await context.request.get("/sitemap.xml")).text();
-  for (const path of ["/privacy", "/terms", "/cookies"])
-    assert(sitemap.includes(path));
+  assert(sitemap.includes("/cookies"));
+  for (const path of ["/privacy", "/terms"])
+    assert(
+      !sitemap.includes(path),
+      "Draft must be absent from sitemap: " + path,
+    );
   assert(!/dashboard|reset-password|onboarding|\/api\//.test(sitemap));
   const robots = await (await context.request.get("/robots.txt")).text();
   for (const path of ["/dashboard", "/api/", "/reset-password", "/onboarding"])

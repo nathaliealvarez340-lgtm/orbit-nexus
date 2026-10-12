@@ -45,10 +45,19 @@ aprueba el envío.
 | SW sapien / SmarterWEB (PAC) | Timbrado de CFDI previamente sellado (Fase 5C, D6) | XML sellado del CFDI, credenciales de PAC | No implementado. Sin credenciales. No inventar endpoints |
 | Antivirus de documentos | Escaneo de uploads | Archivos subidos | Sin decidir; existe la frontera `src/lib/security/malware-scan.ts` |
 | Vercel Firewall | Rate limiting en el borde | Metadatos de solicitudes | Recomendación; no activado |
+| Vercel Web Analytics | Visitas a rutas generales permitidas, solo después de consentimiento ANALYTICS | Ruta saneada sin query ni fragmento; sin IDs, datos fiscales, importes ni propiedades personalizadas | CONFIGURED-PENDING-ACTIVATION: SDK `@vercel/analytics` 2.0.1 integrado; no se verificó ni activó el servicio del proyecto. La app no carga el SDK salvo build con `NEXT_PUBLIC_VERCEL_ANALYTICS_ENABLED=true` y consentimiento vigente |
 
-No existen proveedores de analytics, publicidad, pagos ni monitoreo de errores (por ejemplo,
-Sentry). Agregar cualquiera requiere actualizar este inventario, el Aviso de Privacidad y, si
-aplica, el consentimiento de cookies.
+No se ha confirmado ningún proveedor activo de analytics, publicidad, pagos ni monitoreo de
+errores (por ejemplo, Sentry). Analytics sigue pendiente de activación: antes de habilitarlo se
+debe revisar y actualizar la sección de cookies del Aviso canónico, con nueva versión/hash y
+aprobación jurídica; el borrador actual declara que aún no instala analítica. No se modificó ese
+texto ni se publicó una nueva versión durante la reconciliación.
+
+La integración usa `/_vercel/insights/script.js` en el mismo origen, modo production y endpoints
+del mismo origen: es compatible con `script-src 'self'` y `connect-src 'self'`. No se añadieron
+dominios ni se relajó CSP. Las pruebas del SDK usan un harness local aislado; no son evidencia
+de un proveedor activo. Retirar consentimiento bloquea nuevos eventos incluso con el SDK cargado.
+La activación es una decisión de despliegue posterior, no realizada en este worktree.
 
 ## Al incorporar un proveedor
 

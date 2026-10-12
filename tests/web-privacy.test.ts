@@ -7,7 +7,11 @@ import {
 } from "../src/lib/consent";
 import { sanitizeAnalytics } from "../src/lib/analytics-policy";
 import { safeFormError, errorFields } from "../src/lib/form-errors";
-import { legalContent } from "../src/lib/legal-content";
+import {
+  currentLegalDocument,
+  legalDocumentKinds,
+} from "../src/lib/legal/registry";
+import { legalMetadata, publishedPublicPaths } from "../src/lib/legal-web";
 import { siteOrigin, publicPaths } from "../src/lib/web-metadata";
 test("web consent expires, requires current policy/date/essential and strips arbitrary sensitive keys", () => {
   const valid = {
@@ -81,13 +85,29 @@ test("analytics drops custom events, private IDs, foreign origins and revoked co
   );
 });
 test("legal presentation cannot imply approval or invent dates and identities", () => {
-  for (const content of Object.values(legalContent)) {
-    assert.equal(content.approved, false);
-    assert.equal(content.version, null);
-    assert.equal(content.effectiveDate, null);
-    assert(content.sections.length > 0);
+  for (const kind of legalDocumentKinds) {
+    const document = currentLegalDocument(kind);
+    assert.equal(document.status, "DRAFT");
+    assert.equal(document.effectiveDate, null);
+    assert(document.version);
+    assert(document.pendingTopics.length);
+    assert(document.sections.length > 0);
+    assert.deepEqual(legalMetadata(document, "/privacy").robots, {
+      index: false,
+      follow: false,
+      nocache: true,
+    });
   }
-  assert.notEqual(legalContent.privacy.title, legalContent.terms.title);
+  const documents = legalDocumentKinds.map(currentLegalDocument);
+  assert(!publishedPublicPaths(documents).includes("/privacy"));
+  assert(!publishedPublicPaths(documents).includes("/terms"));
+  const published = documents.map((document) => ({
+    ...document,
+    status: "PUBLISHED" as const,
+  }));
+  assert(publishedPublicPaths(published).includes("/privacy"));
+  assert(publishedPublicPaths(published).includes("/terms"));
+  assert.equal(legalMetadata(published[0], "/privacy").robots, undefined);
 });
 test("SEO uses configured origin and public sitemap allowlist, never sensitive paths", () => {
   assert.equal(

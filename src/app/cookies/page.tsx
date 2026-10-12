@@ -1,18 +1,14 @@
-import { LegalPage } from "@/components/privacy/legal-page";
+import { LegalPageLayout } from "@/components/privacy/legal-page";
 import { CookiePreferencesButton } from "@/components/privacy/cookie-consent";
 import { COOKIE_POLICY_VERSION } from "@/lib/consent";
 import { publicMetadata } from "@/lib/web-metadata";
 export const metadata = publicMetadata("Cookies y preferencias", "/cookies");
 export default function Page() {
   return (
-    <LegalPage
+    <LegalPageLayout
+      summary="Las necesarias permanecen activas. Tú decides si permites analíticas."
       content={{
         title: "Cookies y preferencias",
-        summary:
-          "Las necesarias permanecen activas. Tú decides si permites analíticas.",
-        version: null,
-        effectiveDate: null,
-        approved: true,
         sections: [
           {
             id: "necesarias",
@@ -42,6 +38,6 @@ export default function Page() {
       }}
     >
       <CookiePreferencesButton />
-    </LegalPage>
+    </LegalPageLayout>
   );
 }
