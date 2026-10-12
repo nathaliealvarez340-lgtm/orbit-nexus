@@ -25,8 +25,7 @@ export type FiscalCatalogVersioned = FiscalCatalogSearchResponse & {
 // Consent (§9). Upload, consent, extraction and confirmation are separate steps.
 
 export type FiscalConsentPurpose =
-  | "FISCAL_PROFILE_PREFILL"
-  | "CLIENT_FISCAL_PREFILL";
+  "FISCAL_PROFILE_PREFILL" | "CLIENT_FISCAL_PREFILL";
 
 /** GET /api/fiscal-consents/terms?purpose= (planned). Text is served by the backend. */
 export type FiscalConsentTerms = {
@@ -42,8 +41,13 @@ export type CreateFiscalConsentRequest = {
   /** Document returned by the private upload; resolved inside the active Organization. */
   documentId: string;
   purpose: FiscalConsentPurpose;
-  /** Required for CLIENT_FISCAL_PREFILL; resolved inside the active Organization. */
+  /**
+   * CLIENT_FISCAL_PREFILL needs exactly one of: clientId (an existing client, resolved
+   * inside the active Organization) or newClient: true (a client being created; the
+   * document must be a pending client CSF uploaded by this user, CLIENT-CSF-PRECREATION.md).
+   */
   clientId?: string;
+  newClient?: true;
   /** The checkbox starts unchecked; only an explicit acceptance is valid. */
   accepted: true;
   consentVersion: string;
@@ -67,20 +71,24 @@ export type FiscalDocumentConsent = {
 
 /**
  * Existing POST /api/private-assets (multipart { kind, file }).
- * kind "CSF" exists today; "CLIENT_CSF" is planned. Uploading stores the
- * document privately and never triggers extraction by itself (D11).
+ * Uploading stores the document privately and never triggers extraction by itself (D11).
+ * kind "CLIENT_CSF" also returns the opaque reference that links the document to a client
+ * created by this same user before expiresAt (CLIENT-CSF-PRECREATION.md). The reference
+ * never gives access to the file.
  */
-export type PrivateAssetUploadResponse = { id: string; fileName: string };
+export type PrivateAssetUploadResponse = {
+  id: string;
+  fileName: string;
+  precreationCsfReference?: string;
+  expiresAt?: string;
+};
 
 // ---------------------------------------------------------------------------
 // Extraction (§8). Original document → detected data → user-confirmed data.
 // Detected data is never a source for stamping and never auto-confirmed.
 
 export type ExtractedFiscalFieldStatus =
-  | "DETECTED"
-  | "LOW_CONFIDENCE"
-  | "AMBIGUOUS"
-  | "NOT_FOUND";
+  "DETECTED" | "LOW_CONFIDENCE" | "AMBIGUOUS" | "NOT_FOUND";
 
 export type ExtractedFiscalField = {
   /** null when the document does not contain it: pending capture, never invented. */
@@ -148,6 +156,8 @@ export type FiscalExtractionResult = {
   /** User-facing message, e.g. when not every field could be identified. */
   message: string | null;
   createdAt: string;
+  /** Only for a CLIENT_FISCAL_PREFILL read before the client exists (clientId null). */
+  precreationCsfReference?: string;
 };
 
 /**
@@ -159,6 +169,11 @@ export type FiscalExtractionResult = {
 export type FiscalConfirmation = {
   confirmed: true;
   extractionId?: string;
+  /**
+   * POST /api/clients only: links the pending client CSF (and extractionId, when it was
+   * read) to the client being created. Single use; see CLIENT-CSF-PRECREATION.md.
+   */
+  precreationCsfReference?: string;
 };
 
 // ---------------------------------------------------------------------------

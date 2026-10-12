@@ -7,6 +7,12 @@ import { requireInvoicePlan } from "./plans";
 import { ApiError, enforceRateLimit } from "@/lib/http";
 import { documentFields, validateUpload } from "@/lib/upload-validation";
 import { recordAuditEvent } from "@/lib/audit";
+import { logSafeError } from "@/lib/security/redact";
+import {
+  precreationCsfExpiresAt,
+  precreationCsfReference,
+} from "@/lib/csf/precreation";
+import { purgeAbandonedClientCsf } from "./client-csf-precreation";
 // Uploading only stores the document privately; reading a constancia requires a
 // separate, explicit consent (Fase 5C D11). Client CSFs follow the client permissions.
 export async function uploadPrivateAsset(
@@ -47,10 +53,10 @@ export async function uploadPrivateAsset(
     );
   }
   const data = documentFields(upload);
-  return getDb().$transaction(async (tx) => {
+  const stored = await getDb().$transaction(async (tx) => {
     const doc = await tx.document.create({
       data: { ...data, organizationId, uploadedById: userId, kind },
-      select: { id: true, fileName: true },
+      select: { id: true, fileName: true, createdAt: true },
     });
     if (kind !== "INVOICE_LOGO")
       await recordAuditEvent(tx, {
@@ -67,4 +73,22 @@ export async function uploadPrivateAsset(
       });
     return doc;
   });
+  const response = { id: stored.id, fileName: stored.fileName };
+  if (kind !== "CLIENT_CSF") return response;
+  // A client CSF may be uploaded before its client exists: the reference lets this user
+  // link it when creating the client, until it expires (CLIENT-CSF-PRECREATION.md).
+  try {
+    await purgeAbandonedClientCsf();
+  } catch (error) {
+    logSafeError("client-csf-purge", error);
+  }
+  return {
+    ...response,
+    precreationCsfReference: precreationCsfReference({
+      organizationId,
+      userId,
+      documentId: stored.id,
+    }),
+    expiresAt: precreationCsfExpiresAt(stored.createdAt).toISOString(),
+  };
 }

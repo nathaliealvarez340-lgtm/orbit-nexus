@@ -2,17 +2,27 @@ import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
 import { apiError, ApiError } from "@/lib/http";
 import { requireInvoicePlan } from "@/services/plans";
+import { clientCsfLinked } from "@/services/client-csf-precreation";
+import { precreationCsfExpired } from "@/lib/csf/precreation";
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { organizationId } = await requireTenant();
+    const { organizationId, userId } = await requireTenant();
     const { id } = await params;
     const doc = await getDb().document.findFirst({
       where: { id, organizationId },
     });
     if (!doc) throw new ApiError(404, "Documento no disponible.");
+    // A client CSF not linked to any client yet is pending: only its uploader may read it,
+    // and only until it expires (CLIENT-CSF-PRECREATION.md).
+    if (
+      doc.kind === "CLIENT_CSF" &&
+      !(await clientCsfLinked(getDb(), organizationId, id)) &&
+      (doc.uploadedById !== userId || precreationCsfExpired(doc.createdAt))
+    )
+      throw new ApiError(404, "Documento no disponible.");
     // Outgoing invoice assets also retain plan protection through direct URLs.
     if (
       doc.kind === "INVOICE_LOGO" ||

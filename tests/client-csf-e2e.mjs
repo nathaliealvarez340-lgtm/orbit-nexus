@@ -338,7 +338,13 @@ try {
   const uploadResponse = await uploaded;
   assert.equal(uploadResponse.status(), 201);
   const document = await uploadResponse.json();
-  assert.deepEqual(Object.keys(document).sort(), ["fileName", "id"]);
+  // Client CSF uploads also return the pre-creation reference (CLIENT-CSF-PRECREATION.md).
+  assert.deepEqual(Object.keys(document).sort(), [
+    "expiresAt",
+    "fileName",
+    "id",
+    "precreationCsfReference",
+  ]);
   assert.deepEqual(
     await sql(
       'SELECT kind, "organizationId", "mimeType" FROM "Document" WHERE id=$1',

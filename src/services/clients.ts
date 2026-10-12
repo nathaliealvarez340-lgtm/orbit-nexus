@@ -2,10 +2,15 @@ import "server-only";
 import { getDb } from "@/lib/db";
 import { requireTenant } from "@/lib/tenant";
 import { ApiError, enforceRateLimit } from "@/lib/http";
+import { InvoiceApiError as CodedApiError } from "@/lib/invoice-api";
 import { clientSchema } from "@/lib/phase3-validation";
 import { changedFieldNames, recordAuditEvent } from "@/lib/audit";
 import type { Prisma } from "@/generated/prisma/client";
 import { revertReadyInvoices } from "./outgoing-invoices";
+import {
+  claimPrecreationCsf,
+  consumePrecreationExtraction,
+} from "./client-csf-precreation";
 
 // Receiver data copied into invoice snapshots; changing any of them invalidates READY.
 const receiverFiscalFields = [
@@ -65,15 +70,39 @@ export async function listClients(search = "", archived = false) {
 export async function saveClient(input: unknown, id?: string) {
   const { organizationId, userId } = await requireTenant();
   await enforceRateLimit("clients:" + userId, 60, 60);
-  const { confirmed, extractionId, ...data } = clientSchema.parse(input);
+  const { confirmed, extractionId, precreationCsfReference, ...data } =
+    clientSchema.parse(input);
   return getDb().$transaction(async (tx) => {
     const previous = id
       ? await findEditableClient(tx, organizationId, id)
       : null;
     if (id && !previous) throw new ApiError(404, "Cliente no disponible.");
-    // Fase 5C §10.9: reviewed data from a client CSF extraction of this same client.
     let provenance = {};
-    if (extractionId) {
+    let precreationExtractionId: string | null = null;
+    if (precreationCsfReference) {
+      // A CSF uploaded (and possibly read) before this client existed: linked once, here,
+      // in the same transaction as the creation (CLIENT-CSF-PRECREATION.md).
+      if (id)
+        throw new CodedApiError(
+          400,
+          "La constancia cargada antes de crear el cliente solo se vincula al crearlo.",
+          "PRECREATION_CSF_NOT_ALLOWED",
+        );
+      const claimed = await claimPrecreationCsf(
+        tx,
+        { organizationId, userId },
+        precreationCsfReference,
+        extractionId,
+      );
+      precreationExtractionId = claimed.extractionId;
+      provenance = {
+        csfDocumentId: claimed.documentId,
+        ...(claimed.extractionId
+          ? { sourceExtractionId: claimed.extractionId }
+          : {}),
+      };
+    } else if (extractionId) {
+      // Fase 5C §10.9: reviewed data from a client CSF extraction of this same client.
       const extraction = id
         ? await tx.fiscalDocumentExtraction.findFirst({
             where: {
@@ -106,6 +135,13 @@ export async function saveClient(input: unknown, id?: string) {
       : await tx.client.create({
           data: { ...data, ...provenance, organizationId },
         });
+    if (precreationExtractionId)
+      await consumePrecreationExtraction(
+        tx,
+        organizationId,
+        precreationExtractionId,
+        result.id,
+      );
     await tx.activityLog.create({
       data: {
         organizationId,

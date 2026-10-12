@@ -1,4 +1,5 @@
-import { apiError, assertSameOrigin, readJson } from "@/lib/http";
+import { assertSameOrigin, readJson } from "@/lib/http";
+import { codedApiError } from "@/lib/invoice-api";
 import { listClients, saveClient } from "@/services/clients";
 export async function GET(request: Request) {
   try {
@@ -7,7 +8,7 @@ export async function GET(request: Request) {
       await listClients(p.get("q") ?? "", p.get("archived") === "true"),
     );
   } catch (e) {
-    return apiError(e);
+    return codedApiError(e);
   }
 }
 export async function POST(request: Request) {
@@ -17,6 +18,6 @@ export async function POST(request: Request) {
       status: 201,
     });
   } catch (e) {
-    return apiError(e);
+    return codedApiError(e);
   }
 }

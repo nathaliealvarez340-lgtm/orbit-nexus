@@ -18,6 +18,8 @@ import {
 } from "@/lib/privacy-notice";
 import { recordAuditEvent } from "@/lib/audit";
 import { findEditableClient } from "./clients";
+import { assertPendingClientCsf } from "./client-csf-precreation";
+import { precreationCsfReference } from "@/lib/csf/precreation";
 import type {
   ExtractedFiscalField,
   ExtractedFiscalRegime,
@@ -99,6 +101,8 @@ const consentRequestSchema = z.object({
   documentId: z.string().trim().min(1).max(100),
   purpose: purposeSchema,
   clientId: z.string().trim().min(1).max(100).optional(),
+  /** CLIENT_FISCAL_PREFILL for a client that does not exist yet (CLIENT-CSF-PRECREATION.md). */
+  newClient: z.literal(true).optional(),
   accepted: z.literal(true, {
     error: "Marca la casilla de autorización para continuar.",
   }),
@@ -122,15 +126,22 @@ function consentDto(row: ConsentRow): FiscalDocumentConsent {
 
 /**
  * Same server-side permissions as the data each purpose may change: the fiscal profile
- * requires OWNER/ADMIN; a client CSF requires the permission to edit that client.
+ * requires OWNER/ADMIN; a client CSF requires the permission to edit that client or,
+ * before the client exists, being the uploader of the still pending document (any member
+ * may create clients).
  */
 async function assertPurposePermission(
-  organizationId: string,
-  role: string,
+  session: { organizationId: string; userId: string; role: string },
   purpose: FiscalConsentPurpose,
   clientId: string | null | undefined,
+  precreationDocumentId?: string,
 ) {
-  if (purpose === "FISCAL_PROFILE_PREFILL") return requireAdmin(role);
+  const { organizationId } = session;
+  if (purpose === "FISCAL_PROFILE_PREFILL") return requireAdmin(session.role);
+  if (!clientId && precreationDocumentId) {
+    await assertPendingClientCsf(getDb(), session, precreationDocumentId);
+    return;
+  }
   if (
     !clientId ||
     !(await findEditableClient(getDb(), organizationId, clientId))
@@ -184,19 +195,25 @@ export async function createFiscalConsent(
       "DOCUMENT_NOT_SUPPORTED",
     );
   if (data.purpose === "CLIENT_FISCAL_PREFILL") {
-    if (!data.clientId)
+    if (data.clientId && data.newClient)
+      throw new CodedApiError(
+        400,
+        "Indica un cliente existente o un cliente nuevo, no ambos.",
+        "CLIENT_NOT_ALLOWED",
+      );
+    if (!data.clientId && !data.newClient)
       throw new CodedApiError(
         400,
         "Selecciona el cliente de esta Constancia.",
         "CLIENT_REQUIRED",
       );
     await assertPurposePermission(
-      organizationId,
-      role,
+      { organizationId, userId, role },
       data.purpose,
       data.clientId,
+      data.newClient ? data.documentId : undefined,
     );
-  } else if (data.clientId)
+  } else if (data.clientId || data.newClient)
     throw new CodedApiError(
       400,
       "La autorización del perfil fiscal no se asocia a un cliente.",
@@ -260,10 +277,10 @@ export async function createFiscalExtraction(
       "CONSENT_REQUIRED",
     );
   await assertPurposePermission(
-    organizationId,
-    role,
+    { organizationId, userId, role },
     consent.purpose,
     consent.clientId,
+    consent.documentId,
   );
   if (consent.consentVersion !== consentTerms[consent.purpose].version)
     throw new CodedApiError(
@@ -359,7 +376,7 @@ export async function createFiscalExtraction(
 export async function getFiscalExtraction(
   id: string,
 ): Promise<FiscalExtractionResult> {
-  const { organizationId, role } = await requireTenant();
+  const { organizationId, userId, role } = await requireTenant();
   const row = await getDb().fiscalDocumentExtraction.findFirst({
     where: { id, organizationId },
   });
@@ -371,10 +388,10 @@ export async function getFiscalExtraction(
     );
   // Detected (unconfirmed) data is visible only to whoever may confirm it.
   await assertPurposePermission(
-    organizationId,
-    role,
+    { organizationId, userId, role },
     row.purpose,
     row.clientId,
+    row.createdById === userId ? row.documentId : undefined,
   );
   return extractionDto(row);
 }
@@ -392,11 +409,14 @@ async function extractionDto(
   >;
   const regimes = row.regimes as unknown as ExtractedFiscalRegime[];
   const db = getDb();
+  // A client CSF read before the client exists has nothing saved to compare with.
   const record: Record<string, unknown> | null =
-    row.purpose === "CLIENT_FISCAL_PREFILL" && row.clientId
-      ? await db.client.findFirst({
-          where: { id: row.clientId, organizationId: row.organizationId },
-        })
+    row.purpose === "CLIENT_FISCAL_PREFILL"
+      ? row.clientId
+        ? await db.client.findFirst({
+            where: { id: row.clientId, organizationId: row.organizationId },
+          })
+        : null
       : await db.fiscalProfile.findFirst({
           where: {
             organizationId: row.organizationId,
@@ -451,5 +471,14 @@ async function extractionDto(
     comparison,
     message: row.message,
     createdAt: row.createdAt.toISOString(),
+    ...(row.purpose === "CLIENT_FISCAL_PREFILL" && !row.clientId
+      ? {
+          precreationCsfReference: precreationCsfReference({
+            organizationId: row.organizationId,
+            userId: row.createdById,
+            documentId: row.documentId,
+          }),
+        }
+      : {}),
   };
 }

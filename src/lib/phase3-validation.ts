@@ -53,6 +53,8 @@ export const clientSchema = z
     // Fase 5C §10.9: required only when saving reviewed data from an extraction.
     confirmed: z.literal(true).optional(),
     extractionId: z.string().trim().min(1).max(100).optional(),
+    // Client CSF uploaded before the client existed (CLIENT-CSF-PRECREATION.md).
+    precreationCsfReference: z.string().trim().min(1).max(300).optional(),
   })
   .refine(
     (v) =>
@@ -61,10 +63,14 @@ export const clientSchema = z
       v.rfc.length === (v.personType === "INDIVIDUAL" ? 13 : 12),
     { path: ["rfc"], message: "RFC y tipo de persona incompatibles" },
   )
-  .refine((v) => !v.extractionId || v.confirmed === true, {
-    path: ["confirmed"],
-    message: "Confirma que revisaste los datos fiscales del cliente",
-  })
+  .refine(
+    (v) =>
+      !(v.extractionId || v.precreationCsfReference) || v.confirmed === true,
+    {
+      path: ["confirmed"],
+      message: "Confirma que revisaste los datos fiscales del cliente",
+    },
+  )
   // Fase 5C §10.2/§10.6: official régimen catalog and Uso CFDI compatibility.
   .superRefine((v, ctx) => {
     const regime = fiscalRegimeProblem(v.fiscalRegime, v.personType, v.rfc);
