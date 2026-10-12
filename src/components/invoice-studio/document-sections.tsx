@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CsdSummary } from "@/components/csd/csd-summary";
 import type {
   CreateInvoiceDraftRequest,
   InvoiceStudioClient,
@@ -112,6 +113,9 @@ export function DocumentSections({
             </Link>
           </p>
         )}
+        <div className="mt-5">
+          <CsdSummary key={issuer.organizationId} />
+        </div>
       </StudioSection>
       <StudioSection
         id="studio-receiver"

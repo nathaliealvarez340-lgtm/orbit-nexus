@@ -1,0 +1,247 @@
+.csd-ui {
+  min-width: 0;
+}
+.csd-ui :is(button, input, a),
+.csd-dialog :is(button, a) {
+  min-height: 44px;
+}
+.csd-ui button,
+.csd-dialog button {
+  height: auto;
+  white-space: normal;
+  padding-block: 10px;
+}
+.csd-ui :is(h2, h3),
+.csd-dialog h2 {
+  font-weight: 600;
+  line-height: 1.5;
+}
+.csd-status,
+.csd-history,
+.csd-form {
+  padding: 24px;
+}
+.csd-status-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.csd-status-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.csd-status-heading svg {
+  flex-shrink: 0;
+}
+.csd-help {
+  margin-top: 12px;
+  color: #a1a1aa;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.csd-warning {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #fbbf242e;
+  border-radius: 12px;
+  color: #fde68a;
+  background: #fbbf2408;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.csd-badge {
+  border: 1px solid #ffffff24;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #e4e4e7;
+}
+.csd-metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.csd-metadata dt {
+  color: #a1a1aa;
+  font-size: 12px;
+}
+.csd-metadata dd {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.csd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  align-items: center;
+}
+.csd-link {
+  color: var(--orbit-accent-soft, #c4b5fd);
+  text-decoration: underline;
+  display: inline-flex;
+  align-items: center;
+}
+.csd-layout {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+.csd-form label {
+  display: block;
+  font-size: 14px;
+  color: #d4d4d8;
+  margin-top: 20px;
+}
+.csd-form .input {
+  margin-top: 8px;
+  font-size: 16px;
+}
+.csd-form input[type="file"] {
+  height: auto;
+  padding: 12px;
+  max-width: 100%;
+}
+.csd-form input[type="file"]::file-selector-button {
+  border: 1px solid #ffffff24;
+  border-radius: 8px;
+  background: #ffffff08;
+  color: white;
+  padding: 10px;
+  margin-right: 12px;
+}
+.csd-form label.csd-check {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  line-height: 1.7;
+}
+.csd-check input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--orbit-accent, #8b5cf6);
+}
+.csd-terms {
+  margin-top: 16px;
+  border: 1px solid #ffffff18;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #d4d4d8;
+}
+.csd-terms p {
+  margin-top: 12px;
+}
+.csd-history {
+  margin-top: 24px;
+}
+.csd-history-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+.csd-history-table :is(th, td) {
+  text-align: left;
+  vertical-align: top;
+  padding: 12px 8px;
+  border-bottom: 1px solid #ffffff18;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.csd-history-table th,
+.csd-cell-label {
+  color: #a1a1aa;
+  font-weight: 500;
+}
+.csd-cell-label {
+  display: none;
+}
+@media (max-width: 1279px) {
+  .csd-history-table {
+    display: block;
+  }
+  .csd-history-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .csd-history-table tbody {
+    display: grid;
+    gap: 16px;
+  }
+  .csd-history-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    border: 1px solid #ffffff18;
+    padding: 12px;
+    border-radius: 12px;
+    min-width: 0;
+  }
+  .csd-history-table td {
+    display: block;
+    border-bottom: 0;
+  }
+  .csd-cell-label {
+    display: block;
+    margin-bottom: 4px;
+  }
+}
+.csd-destructive {
+  color: #fecaca !important;
+  border: 1px solid #f871714d !important;
+  background: #ef444410 !important;
+}
+.csd-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: calc(100dvh - 24px);
+  width: calc(100% - 24px);
+  max-width: 560px;
+  overflow-y: auto;
+  background: #101014;
+  color: #f4f4f5;
+  border: 1px solid #ffffff24;
+  border-radius: 20px;
+  padding: 24px;
+}
+.csd-dialog::backdrop {
+  background: #000b;
+  backdrop-filter: blur(4px);
+}
+.csd-dialog :focus-visible {
+  outline: 2px solid var(--orbit-accent-soft, #c4b5fd);
+  outline-offset: 3px;
+}
+@media (min-width: 1280px) {
+  .csd-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+}
+@media (max-width: 639px) {
+  .csd-status,
+  .csd-form,
+  .csd-history,
+  .csd-dialog {
+    padding: 16px;
+  }
+  .csd-actions button {
+    flex-grow: 1;
+  }
+}

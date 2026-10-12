@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { requirePageTenant } from "@/lib/tenant";
 import { fiscalProfileComplete, addressFields } from "@/lib/fiscal-catalogs";
 import { getDb } from "@/lib/db";
+import { CsdSummary } from "@/components/csd/csd-summary";
 export default async function Page({
   searchParams,
 }: {
@@ -55,6 +56,7 @@ export default async function Page({
           ? "Perfil completo · Constancia y dirección registradas"
           : "Perfil incompleto · Completa la dirección y adjunta la constancia PDF"}
       </p>
+      <CsdSummary key={organizationId} />
       <FiscalForm
         key={`${organizationId}:${document || "profile"}`}
         initial={current}

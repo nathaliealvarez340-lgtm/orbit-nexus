@@ -68,6 +68,11 @@ const navigation: { title: string; icon: LucideIcon; items: NavItem[] }[] = [
         icon: ReceiptText,
         children: [
           {
+            href: "/dashboard/stamping",
+            label: "Certificado de Sello Digital",
+            icon: ShieldUser,
+          },
+          {
             href: "/dashboard/invoices/new",
             label: "Nueva factura",
             icon: FilePlus2,
@@ -126,8 +131,11 @@ const navigation: { title: string; icon: LucideIcon; items: NavItem[] }[] = [
 
 function matchesItem(item: NavItem, pathname: string): boolean {
   if (item.label === "Facturas")
-    return /^\/dashboard\/invoices\/(new|settings|issued|drafts)(\/|$)/.test(
-      pathname,
+    return (
+      pathname === "/dashboard/stamping" ||
+      /^\/dashboard\/invoices\/(new|settings|issued|drafts)(\/|$)/.test(
+        pathname,
+      )
     );
   return Boolean(
     (item.href &&

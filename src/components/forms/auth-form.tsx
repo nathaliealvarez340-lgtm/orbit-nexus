@@ -8,7 +8,13 @@ import { authClient } from "@/lib/auth-client";
 import { registerSchema } from "@/lib/validation";
 import { FormFeedback } from "./form-feedback";
 
-export function AuthForm({ mode }: { mode: "login" | "register" }) {
+export function AuthForm({
+  mode,
+  returnTo,
+}: {
+  mode: "login" | "register";
+  returnTo?: "/dashboard/stamping";
+}) {
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState("");
@@ -56,8 +62,11 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       }
       if (!response.data?.user) throw new Error("SESSION_NOT_CREATED");
       // Server resolves the session and membership; discard pre-login router cache.
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.assign("/api/auth/continue");
+      window.location.assign(
+        mode === "login" && returnTo === "/dashboard/stamping"
+          ? "/dashboard/stamping"
+          : "/api/auth/continue",
+      );
       navigating = true;
     } catch {
       setError("No se pudo conectar. Intenta nuevamente.");

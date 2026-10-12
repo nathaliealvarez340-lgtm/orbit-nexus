@@ -853,7 +853,7 @@ try {
   ]) {
     await page.goto(route);
     if (route === "/dashboard/stamping")
-      await expect(page).toHaveURL(/\/dashboard\/invoices\/new$/);
+      await expect(page).toHaveURL(/\/dashboard\/stamping$/);
     assert(!(await page.locator("[data-nextjs-dialog]").count()));
     assert(
       await page.evaluate(
