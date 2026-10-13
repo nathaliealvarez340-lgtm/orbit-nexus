@@ -477,7 +477,7 @@ export async function extractionUiChecks(context, pass) {
   await read.click();
   await expect(
     fixture.getByText(
-      "No pudimos identificar todos los datos de tu Constancia. Puedes revisarlos y completarlos manualmente.",
+      "No pudimos leer el PDF. Completa los datos manualmente o carga otra constancia.",
       { exact: true },
     ),
   ).toBeVisible();

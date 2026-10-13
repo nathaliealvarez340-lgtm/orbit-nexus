@@ -45,6 +45,38 @@
   font-size: 14px;
   color: #d4d4d8;
 }
+.fiscal-ui .fiscal-upload {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  margin-block: 16px;
+  border: 1px dashed #ffffff30;
+  border-radius: 12px;
+  background: #ffffff03;
+}
+.fiscal-ui .fiscal-upload-icon {
+  flex-shrink: 0;
+  color: var(--orbit-accent-soft);
+}
+.fiscal-ui .fiscal-upload-body {
+  min-width: 0;
+  flex: 1;
+}
+.fiscal-ui .fiscal-upload-name {
+  display: flex;
+  gap: 8px;
+  margin-block: 12px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.fiscal-ui .fiscal-upload-name svg {
+  flex-shrink: 0;
+}
+.fiscal-ui .fiscal-upload :is(button, a):focus-visible {
+  outline: 2px solid var(--orbit-accent-soft);
+  outline-offset: 3px;
+}
 .fiscal-ui .fiscal-check {
   display: flex;
   align-items: flex-start;

@@ -237,9 +237,11 @@ try {
   await page
     .getByRole("button", { name: "Guardar cliente", exact: true })
     .click();
-  await expect(page.getByRole("status")).toContainText(
-    "✓ Información guardada correctamente",
-  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "✓ Información guardada correctamente" }),
+  ).toContainText("✓ Información guardada correctamente");
   pass(
     "client create/update is real, ignores client tenant IDs, blocks foreign access and bad origins",
   );

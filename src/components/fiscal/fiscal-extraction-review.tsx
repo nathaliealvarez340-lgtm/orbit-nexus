@@ -39,9 +39,14 @@ export function FiscalExtractionReview({
         Información detectada · pendiente de tu revisión
       </h3>
       <p className="fiscal-help" role="status">
-        {result.status !== "PROCESSED"
-          ? "No pudimos identificar todos los datos de tu Constancia. Puedes revisarlos y completarlos manualmente."
-          : "Revisa los datos antes de incorporarlos al formulario. Detectado no significa confirmado."}
+        {result.status === "UNREADABLE"
+          ? "No pudimos leer el PDF. Completa los datos manualmente o carga otra constancia."
+          : result.purpose === "CLIENT_FISCAL_PREFILL" &&
+              result.clientId === null
+            ? "Los datos disponibles ya están en el formulario. Revisa o corrige los valores y elige explícitamente el régimen antes de confirmar. Los datos faltantes requieren captura manual."
+            : result.status !== "PROCESSED"
+              ? "No pudimos identificar todos los datos de tu Constancia. Puedes revisarlos y completarlos manualmente."
+              : "Revisa los datos antes de incorporarlos al formulario. Detectado no significa confirmado."}
       </p>
       <div className="fiscal-detected-grid">
         {Object.entries(result.fields).map(([key, field]) => {

@@ -9,6 +9,113 @@ import {
   fiscalErrorMessage,
 } from "../src/components/fiscal/transport";
 import { consent, consentRequest, extraction } from "./fiscal-ui-fixture";
+import {
+  pendingCsfExpired,
+  prefillClientValues,
+} from "../src/components/fiscal/client-csf-prefill";
+
+test("pre-creation consent uses newClient exclusively and correlates a null client result", async () => {
+  const request = {
+    ...consentRequest,
+    purpose: "CLIENT_FISCAL_PREFILL" as const,
+    newClient: true as const,
+  };
+  const result = {
+    ...extraction,
+    purpose: request.purpose,
+    precreationCsfReference: "test-opaque-reference",
+  };
+  const transport: CsfTransport = {
+    consent: async (body) => {
+      assert.equal(body.newClient, true);
+      assert.equal(body.clientId, undefined);
+      return { ...consent, purpose: request.purpose };
+    },
+    extract: async () => result,
+  };
+  assert.equal(await extractAuthorizedCsf(transport, request), result);
+  await assert.rejects(
+    extractAuthorizedCsf(transport, {
+      ...request,
+      clientId: "existing-client",
+    }),
+  );
+});
+
+test("client prefill leaves null fields and non-extractable/contact values intact, choosing no regime", () => {
+  const values = {
+    rfc: "old",
+    legalName: "old",
+    street: "manual street",
+    personType: "COMPANY",
+    fiscalRegime: "601",
+    cfdiUse: "G03",
+    email: "manual@example.test",
+    phone: "manual",
+    defaultPaymentForm: "99",
+  };
+  const result = prefillClientValues(values, {
+    ...extraction,
+    fields: {
+      ...extraction.fields,
+      email: { value: "untrusted@example.test" },
+      cfdiUse: { value: "untrusted" },
+    } as typeof extraction.fields,
+  });
+  assert.equal(result.rfc, extraction.fields.rfc.value);
+  assert.equal(result.legalName, extraction.fields.legalName.value);
+  for (const field of [
+    "street",
+    "fiscalRegime",
+    "cfdiUse",
+    "email",
+    "phone",
+    "defaultPaymentForm",
+  ])
+    assert.equal(result[field], values[field as keyof typeof values]);
+  assert.equal(values.rfc, "old");
+});
+
+test("pending CSF expiry treats missing or malformed expiration/reference as unavailable", () => {
+  const now = Date.now();
+  const base = {
+    id: "document",
+    fileName: "synthetic.pdf",
+    precreationCsfReference: "opaque",
+  };
+  assert(pendingCsfExpired(base, now));
+  assert(pendingCsfExpired({ ...base, expiresAt: "invalid" }, now));
+  assert(
+    pendingCsfExpired({ ...base, expiresAt: new Date(now).toISOString() }, now),
+  );
+  assert.equal(
+    pendingCsfExpired(
+      { ...base, expiresAt: new Date(now + 1000).toISOString() },
+      now,
+    ),
+    false,
+  );
+});
+
+test("real client upload preserves only safe pre-creation metadata", async () => {
+  const originalFetch = globalThis.fetch;
+  const asset = {
+    id: "document",
+    fileName: "synthetic.pdf",
+    precreationCsfReference: "opaque",
+    expiresAt: "2026-10-13T00:00:00Z",
+  };
+  try {
+    globalThis.fetch = async () =>
+      Response.json({ ...asset, storagePath: "never-expose" });
+    assert.deepEqual(
+      await clientCsfTransport.upload!(new File(["test"], "synthetic.pdf")),
+      asset,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("both purposes expose real upload, terms, consent and extraction transports", () => {
   for (const transport of [issuerCsfTransport, clientCsfTransport])

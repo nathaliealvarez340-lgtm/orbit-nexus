@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
+import { FileText, Upload } from "lucide-react";
 import type {
   FiscalConsentPurpose,
   FiscalConsentTerms,
@@ -9,6 +10,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { FormFeedback } from "@/components/forms/form-feedback";
 import { FiscalConsent } from "./fiscal-consent";
+import { invalidatesPendingCsf, pendingCsfExpired } from "./client-csf-prefill";
 import {
   extractAuthorizedCsf,
   fiscalErrorMessage,
@@ -22,6 +24,7 @@ export function CsfPrefill({
   documentId,
   transport,
   onDocument,
+  onUpload,
   onExtraction,
   onBusy,
   disabled = false,
@@ -31,6 +34,7 @@ export function CsfPrefill({
   documentId?: string;
   transport: CsfTransport;
   onDocument: (id: string) => void;
+  onUpload?: (asset: PrivateAssetUploadResponse | null) => void;
   onExtraction: (result: FiscalExtractionResult | null) => void;
   onBusy?: (busy: boolean) => void;
   disabled?: boolean;
@@ -45,8 +49,48 @@ export function CsfPrefill({
   const [termsAttempt, setTermsAttempt] = useState(0);
   const [termsLoading, setTermsLoading] = useState(!!transport.terms);
   const [unavailable, setUnavailable] = useState(false);
+  const [selectedName, setSelectedName] = useState("");
+  const [read, setRead] = useState(false);
   const lock = useRef(false);
-  const savedFirstId = useId();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploadButton = useRef<HTMLButtonElement>(null);
+  const mounted = useRef(true);
+  const fileId = useId();
+  const newClient = purpose === "CLIENT_FISCAL_PREFILL" && !clientId;
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const clearDocument = () => {
+    setDocument(null);
+    setSelectedName("");
+    setAccepted(false);
+    setRead(false);
+    if (fileInput.current) fileInput.current.value = "";
+    onUpload?.(null);
+    onExtraction(null);
+    onDocument("");
+  };
+  useEffect(() => {
+    if (!newClient || !document?.expiresAt) return;
+    const timer = setTimeout(
+      () => {
+        setDocument(null);
+        setSelectedName("");
+        setAccepted(false);
+        setRead(false);
+        onUpload?.(null);
+        onExtraction(null);
+        setError(
+          "La constancia venció. Vuelve a subirla o guarda el cliente sin ella.",
+        );
+      },
+      Math.max(0, Date.parse(document.expiresAt) - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [document, newClient, onUpload, onExtraction]);
   useEffect(() => {
     if (!transport.terms) return;
     const controller = new AbortController();
@@ -87,7 +131,7 @@ export function CsfPrefill({
     >
       <h2 className="font-medium">
         {client
-          ? "Constancia del cliente · opcional"
+          ? "Constancia de Situación Fiscal · opcional"
           : "1. Constancia de Situación Fiscal"}
       </h2>
       <p className="fiscal-help">
@@ -95,62 +139,127 @@ export function CsfPrefill({
           ? "Opcional pero recomendada para autocompletar y reducir errores de captura. Puedes crear el cliente manualmente sin este documento."
           : "Carga tu PDF privado antes de capturar los datos. Subirlo no autoriza su lectura ni confirma la información."}
       </p>
-      <label className="fiscal-file-label">
-        Constancia de Situación Fiscal · PDF, hasta 10 MB
-        <input
-          className="input mt-2"
-          type="file"
-          accept=".pdf,application/pdf"
-          aria-describedby={client && !clientId ? savedFirstId : undefined}
-          disabled={
-            disabled ||
-            unavailable ||
-            !!busy ||
-            !transport.upload ||
-            (client && !clientId)
-          }
-          onChange={async (event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (!file || !transport.upload || lock.current) return;
-            setAccepted(false);
-            setError("");
-            onExtraction(null);
-            if (!/\.pdf$/i.test(file.name) || file.size > 10 * 1024 * 1024) {
-              setError("Selecciona un PDF de hasta 10 MB.");
-              return;
-            }
-            lock.current = true;
-            setBusy("upload");
-            onBusy?.(true);
-            try {
-              const uploaded = await transport.upload(file);
-              setDocument(uploaded);
-              onDocument(uploaded.id);
-            } catch (failure) {
-              setError(
-                fiscalErrorMessage(
-                  failure,
-                  "No pudimos cargar la constancia. Puedes revisar el archivo o continuar manualmente.",
-                ),
-              );
-            } finally {
-              lock.current = false;
-              setBusy(null);
-              onBusy?.(false);
-            }
-          }}
-        />
-      </label>
-      {client && !clientId && (
-        <p id={savedFirstId} className="fiscal-pending">
-          Guarda primero el cliente. Después podrás editarlo y cargar su
-          constancia opcional.
-        </p>
-      )}
+      <div className="fiscal-upload">
+        <Upload aria-hidden="true" size={28} className="fiscal-upload-icon" />
+        <div className="fiscal-upload-body">
+          <label className="sr-only" htmlFor={fileId}>
+            Constancia de Situación Fiscal
+          </label>
+          <input
+            ref={fileInput}
+            id={fileId}
+            className="sr-only"
+            tabIndex={-1}
+            type="file"
+            accept=".pdf,application/pdf"
+            disabled={disabled || unavailable || !!busy || !transport.upload}
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file || !transport.upload || lock.current) return;
+              if (newClient) clearDocument();
+              else {
+                setAccepted(false);
+                setRead(false);
+                onExtraction(null);
+              }
+              setSelectedName(file.name);
+              setError("");
+              if (
+                !/\.pdf$/i.test(file.name) ||
+                file.size === 0 ||
+                file.size > 10 * 1024 * 1024
+              ) {
+                if (!newClient) setSelectedName("");
+                setError("Selecciona un PDF de hasta 10 MB.");
+                return;
+              }
+              lock.current = true;
+              setBusy("upload");
+              onBusy?.(true);
+              try {
+                const uploaded = await transport.upload(file);
+                if (!mounted.current) return;
+                if (newClient && pendingCsfExpired(uploaded))
+                  throw new FiscalUiError("PRECREATION_CSF_EXPIRED", 410);
+                setDocument(uploaded);
+                setSelectedName("");
+                onUpload?.(uploaded);
+                onDocument(uploaded.id);
+              } catch (failure) {
+                if (!mounted.current) return;
+                if (!newClient) setSelectedName("");
+                setError(
+                  failure instanceof FiscalUiError &&
+                    failure.status === 400 &&
+                    !failure.code
+                    ? "Sube una constancia PDF válida, no cifrada, de hasta 10 MB."
+                    : fiscalErrorMessage(
+                        failure,
+                        "No pudimos cargar la constancia. Puedes revisar el archivo o continuar manualmente.",
+                      ),
+                );
+              } finally {
+                lock.current = false;
+                if (mounted.current) {
+                  setBusy(null);
+                  onBusy?.(false);
+                }
+              }
+            }}
+          />
+          <Button
+            variant="secondary"
+            disabled={disabled || unavailable || !!busy || !transport.upload}
+            onClick={(event) => {
+              uploadButton.current = event.currentTarget;
+              fileInput.current?.click();
+            }}
+          >
+            {document || selectedName
+              ? "Reemplazar constancia"
+              : "Subir constancia"}
+          </Button>
+          <p className="fiscal-help">PDF, hasta 10 MB</p>
+          {(document || selectedName) && (
+            <p className="fiscal-upload-name">
+              <FileText size={18} aria-hidden="true" />
+              <span>{selectedName || document?.fileName}</span>
+            </p>
+          )}
+          {newClient && (document || selectedName) && (
+            <Button
+              variant="secondary"
+              disabled={disabled || !!busy}
+              onClick={() => {
+                clearDocument();
+                setError("");
+                uploadButton.current?.focus();
+              }}
+            >
+              Quitar archivo
+            </Button>
+          )}
+          <p role="status" aria-live="polite" className="fiscal-help">
+            {busy === "upload"
+              ? "Subiendo constancia…"
+              : busy === "extract"
+                ? "Procesando constancia…"
+                : error
+                  ? "Revisa el mensaje de la constancia."
+                  : read
+                    ? "Lectura terminada. Revisa y confirma los datos fiscales."
+                    : document
+                      ? "Constancia cargada · lista para autorizar su lectura."
+                      : selectedName
+                        ? "Archivo seleccionado · pendiente de carga válida."
+                        : "Sin archivo · puedes capturar los datos manualmente."}
+          </p>
+        </div>
+      </div>
       {document && (
         <p className="fiscal-help">
-          Documento privado: {document.fileName} ·{" "}
+          Documento privado ·{" "}
           <a
             className="underline"
             href={`/api/documents/${encodeURIComponent(document.id)}`}
@@ -175,7 +284,7 @@ export function CsfPrefill({
           !!busy ||
           !document ||
           !connected ||
-          (client && !clientId)
+          (newClient && read)
         }
       />
       {!connected && (
@@ -186,9 +295,9 @@ export function CsfPrefill({
       )}
       {terms && terms.privacyNoticeVersion === null && (
         <p className="fiscal-pending">
-          Aviso de Privacidad sin versión publicada. El backend permite pruebas
-          locales y bloquea el procesamiento productivo sin aviso vigente. Esta
-          operación no representa aprobación para producción.
+          La lectura automática requiere un Aviso de Privacidad publicado.
+          Puedes completar los datos manualmente y conservar la constancia al
+          guardar.
         </p>
       )}
       <Button
@@ -200,11 +309,12 @@ export function CsfPrefill({
           !accepted ||
           !document ||
           !connected ||
-          (client && !clientId)
+          (newClient && read)
         }
         onClick={async () => {
           if (
             lock.current ||
+            (newClient && read) ||
             !connected ||
             !accepted ||
             !document ||
@@ -213,6 +323,13 @@ export function CsfPrefill({
             !transport.extract
           )
             return;
+          if (newClient && pendingCsfExpired(document)) {
+            clearDocument();
+            setError(
+              "La constancia venció. Vuelve a subirla o guarda el cliente sin ella.",
+            );
+            return;
+          }
           lock.current = true;
           setBusy("extract");
           setError("");
@@ -221,13 +338,28 @@ export function CsfPrefill({
             const result = await extractAuthorizedCsf(transport, {
               documentId: document.id,
               purpose,
-              ...(client ? { clientId } : {}),
+              ...(client
+                ? newClient
+                  ? { newClient: true as const }
+                  : { clientId }
+                : {}),
               accepted: true,
               consentVersion: terms.consentVersion,
               privacyNoticeVersion: terms.privacyNoticeVersion,
             });
+            if (!mounted.current) return;
+            if (newClient && pendingCsfExpired(document))
+              throw new FiscalUiError("PRECREATION_CSF_EXPIRED", 410);
+            if (
+              newClient &&
+              result.precreationCsfReference !==
+                document.precreationCsfReference
+            )
+              throw new Error("Lectura no correlacionada.");
             onExtraction(result);
+            setRead(true);
           } catch (failure) {
+            if (!mounted.current) return;
             setError(
               fiscalErrorMessage(
                 failure,
@@ -235,6 +367,8 @@ export function CsfPrefill({
               ),
             );
             if (failure instanceof FiscalUiError) {
+              if (newClient && invalidatesPendingCsf(failure.code))
+                clearDocument();
               if (failure.code === "CLIENT_NOT_AVAILABLE") setUnavailable(true);
               if (
                 [
@@ -249,8 +383,10 @@ export function CsfPrefill({
             }
           } finally {
             lock.current = false;
-            setBusy(null);
-            onBusy?.(false);
+            if (mounted.current) {
+              setBusy(null);
+              onBusy?.(false);
+            }
           }
         }}
       >

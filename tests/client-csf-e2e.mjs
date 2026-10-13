@@ -191,18 +191,13 @@ try {
   await expect(page.locator('input[name="legalName"]')).toHaveValue(
     "Cliente Persistente QA",
   );
-  // A new client's CSF waits for the first save, and the disabled input says so.
+  // Pre-creation upload is now supported; manual capture still needs no CSF.
   const newClientFile = form.locator('input[type="file"]');
-  await expect(newClientFile).toBeDisabled();
-  const describedBy = await newClientFile.getAttribute("aria-describedby");
-  await expect(page.locator(`[id="${describedBy}"]`)).toContainText(
-    "Guarda primero el cliente",
-  );
-  assert(
-    Number(await newClientFile.evaluate((n) => getComputedStyle(n).opacity)) <
-      1,
-    "a disabled control must look disabled",
-  );
+  await expect(newClientFile).toBeEnabled();
+  await expect(
+    form.getByRole("button", { name: "Subir constancia" }),
+  ).toBeVisible();
+  await expect(form).not.toContainText("Guarda primero el cliente");
   pass(
     "a blocked client save explains why, focuses the confirmation, sends nothing and keeps the capture",
   );

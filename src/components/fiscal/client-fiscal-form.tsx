@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   FiscalConfirmation as Confirmation,
   FiscalExtractionResult,
+  PrivateAssetUploadResponse,
 } from "@/types/fiscal-identity";
 import type { InvoiceFiscalCatalogs } from "@/types/invoice-studio";
 import { addressFields } from "@/lib/fiscal-catalogs";
@@ -18,6 +19,11 @@ import {
 import { FiscalCatalogFields } from "./fiscal-catalog-fields";
 import { FiscalConfirmation } from "./fiscal-confirmation";
 import { FiscalExtractionReview } from "./fiscal-extraction-review";
+import {
+  invalidatesPendingCsf,
+  pendingCsfExpired,
+  prefillClientValues,
+} from "./client-csf-prefill";
 
 const fields = [
   ["rfc", "RFC"],
@@ -64,6 +70,9 @@ export function ClientFiscalForm({
     null,
   );
   const [selectedRegime, setSelectedRegime] = useState<string>();
+  const [pendingCsf, setPendingCsf] =
+    useState<PrivateAssetUploadResponse | null>(null);
+  const [csfAttempt, setCsfAttempt] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [documentBusy, setDocumentBusy] = useState(false);
@@ -101,6 +110,15 @@ export function ClientFiscalForm({
           setError("Espera a que termine la carga o lectura de la constancia.");
           return;
         }
+        if (!id && pendingCsf && pendingCsfExpired(pendingCsf)) {
+          setPendingCsf(null);
+          setExtraction(null);
+          setCsfAttempt((attempt) => attempt + 1);
+          setError(
+            "La constancia venció. Vuelve a subirla o guarda el cliente sin ella.",
+          );
+          return;
+        }
         if (!confirmed) {
           unconfirmed();
           return;
@@ -120,6 +138,9 @@ export function ClientFiscalForm({
           const confirmation: Confirmation = {
             confirmed: true,
             ...(extraction ? { extractionId: extraction.id } : {}),
+            ...(!id && pendingCsf
+              ? { precreationCsfReference: pendingCsf.precreationCsfReference }
+              : {}),
           };
           await fiscalRequest(
             "/api/clients" + (id ? "/" + encodeURIComponent(id) : ""),
@@ -136,10 +157,20 @@ export function ClientFiscalForm({
               }),
             },
           );
+          setPendingCsf(null);
+          setExtraction(null);
+          setValues({});
+          setCsfAttempt((attempt) => attempt + 1);
           onSaved();
         } catch (failure) {
-          if (failure instanceof FiscalUiError)
+          if (failure instanceof FiscalUiError) {
             setInvalidFields(failure.fieldKeys);
+            if (!id && invalidatesPendingCsf(failure.code)) {
+              setPendingCsf(null);
+              setExtraction(null);
+              setCsfAttempt((attempt) => attempt + 1);
+            }
+          }
           setError(
             fiscalErrorMessage(
               failure,
@@ -156,6 +187,7 @@ export function ClientFiscalForm({
         {id ? "Editar cliente" : "Datos del cliente"}
       </h2>
       <CsfPrefill
+        key={csfAttempt}
         purpose="CLIENT_FISCAL_PREFILL"
         clientId={id}
         documentId={
@@ -166,6 +198,9 @@ export function ClientFiscalForm({
         transport={clientCsfTransport}
         disabled={busy}
         onBusy={setDocumentBusy}
+        onUpload={(asset) => {
+          if (!id) setPendingCsf(asset);
+        }}
         onDocument={() => {
           setConfirmed(false);
         }}
@@ -173,6 +208,8 @@ export function ClientFiscalForm({
           setExtraction(result);
           setSelectedRegime(undefined);
           setConfirmed(false);
+          if (!id && result)
+            setValues((previous) => prefillClientValues(previous, result));
         }}
       />
       {extraction && (

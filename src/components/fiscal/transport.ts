@@ -31,13 +31,21 @@ const errorMessages: Record<string, string> = {
   PRIVACY_NOTICE_OUTDATED:
     "El Aviso de Privacidad cambió. Actualiza la autorización y revísala de nuevo.",
   PRIVACY_NOTICE_MISSING:
-    "La lectura está bloqueada hasta publicar el Aviso de Privacidad vigente. Puedes continuar manualmente.",
+    "La constancia quedó cargada, pero la lectura automática no está disponible hasta que el Aviso de Privacidad esté publicado. Puedes completar los datos manualmente.",
+  PRECREATION_CSF_EXPIRED:
+    "La constancia venció. Vuelve a subirla o guarda el cliente sin ella.",
+  PRECREATION_CSF_CONSUMED:
+    "Esta constancia ya se vinculó a un cliente. Vuelve a cargarla para este cliente o continúa sin ella.",
+  PRECREATION_CSF_NOT_AVAILABLE:
+    "Esta constancia ya no está disponible. Vuelve a cargarla o continúa sin ella.",
+  UNREADABLE:
+    "No pudimos leer el PDF. Completa los datos manualmente o carga otra constancia.",
   DOCUMENT_NOT_AVAILABLE:
     "La constancia ya no está disponible para esta empresa. Cárgala de nuevo.",
   DOCUMENT_NOT_SUPPORTED:
     "Solo se pueden leer Constancias de Situación Fiscal en PDF.",
   CLIENT_REQUIRED:
-    "Guarda y selecciona el cliente antes de cargar su constancia.",
+    "No pudimos identificar el flujo del cliente. Reabre el formulario e inténtalo de nuevo.",
   CLIENT_NOT_AVAILABLE:
     "El cliente ya no está disponible o está archivado. No podemos continuar con su constancia.",
   CLIENT_NOT_ALLOWED:
@@ -82,6 +90,7 @@ const fieldLabels: Record<string, string> = {
   confirmed: "confirmación",
   extractionId: "extracción",
   csfDocumentId: "constancia",
+  precreationCsfReference: "constancia temporal",
 };
 export async function fiscalRequest<T>(
   url: string,
@@ -144,7 +153,17 @@ function createCsfTransport(kind: "CSF" | "CLIENT_CSF"): CsfTransport {
         throw new Error(
           "No pudimos cargar la constancia. Revisa que sea un PDF válido de hasta 10 MB.",
         );
-      return { id: data.id, fileName: data.fileName };
+      return {
+        id: data.id,
+        fileName: data.fileName,
+        ...(typeof data.precreationCsfReference === "string" &&
+        typeof data.expiresAt === "string"
+          ? {
+              precreationCsfReference: data.precreationCsfReference,
+              expiresAt: data.expiresAt,
+            }
+          : {}),
+      };
     },
     terms(purpose, signal) {
       return fiscalRequest<FiscalConsentTerms>(
@@ -207,7 +226,8 @@ export async function extractAuthorizedCsf(
     !request.consentVersion ||
     !transport.consent ||
     !transport.extract ||
-    (request.purpose === "CLIENT_FISCAL_PREFILL" && !request.clientId)
+    (request.purpose === "CLIENT_FISCAL_PREFILL" &&
+      !!request.clientId === (request.newClient === true))
   )
     throw new Error("Lectura no disponible o no autorizada.");
   const consent = await transport.consent(request);

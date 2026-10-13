@@ -61,7 +61,9 @@ export async function fiscalIntegrationChecks({ page, context, pass }) {
     page.getByRole("checkbox", { name: /^Autorizo a ORBIT/ }),
   ).toBeEnabled();
   await expect(
-    page.getByText(/Aviso de Privacidad sin versión publicada/),
+    page.getByText(
+      /La lectura automática requiere un Aviso de Privacidad publicado/,
+    ),
   ).toBeVisible();
   const buffer = await syntheticCsf({
     rfc: "EKU9003173C9",
