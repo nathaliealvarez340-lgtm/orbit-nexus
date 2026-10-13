@@ -330,7 +330,7 @@ el orden de serialización.
 
 ## 12. Gates siguientes
 
-1. **Cadena original** (siguiente): versionar los 32 `xsl:include` de
+1. **Cadena original** (en curso: `docs/tasks/FASE5C5-CADENA-ORIGINAL.md`; includes versionados, motor pendiente de autorización): versionar los `xsl:include` de
    `cadenaoriginal_4_0.xslt` (incluido `utilerias.xslt`) desde sus URLs oficiales con hash;
    decidir motor XSLT con el gate de `FASE5C3 §AA.5.3` (la hoja declara `version="2.0"`);
    serializador pre-sello con `NoCertificado`/`Certificado` del CSD `VALID`; reproducir byte

@@ -24,22 +24,28 @@ const stored = (name: string) =>
       r.name === name && typeof r.stored === "string",
   );
 
+const nameSegment = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
 /**
  * Absolute path of a versioned resource, or null when `stored` is absolute, escapes the
- * resources directory (.., symbolic segments, other drive) or does not end in `name`.
+ * resources directory (.., symbolic segments, other drive) or is not exactly
+ * resources/sat/cfdi40/<name>. Names may have subdirectories (the XSLT includes keep their
+ * official path under xslt/), each segment a plain file or directory name.
  */
 export function cfdi40ResourcePath(
   name: string,
   storedPath: string,
   root: string,
 ): string | null {
-  if (path.isAbsolute(storedPath) || storedPath.includes("\\")) return null;
+  if (
+    path.isAbsolute(storedPath) ||
+    storedPath.includes("\\") ||
+    !name.split("/").every((segment) => nameSegment.test(segment)) ||
+    storedPath !== cfdi40ResourceDirectory + "/" + name
+  )
+    return null;
   const directory = path.resolve(root, cfdi40ResourceDirectory);
   const resolved = path.resolve(root, storedPath);
-  return path.dirname(resolved) === directory &&
-    path.basename(resolved) === name
-    ? resolved
-    : null;
+  return resolved.startsWith(directory + path.sep) ? resolved : null;
 }
 
 export async function readCfdi40Resource(

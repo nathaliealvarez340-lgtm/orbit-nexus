@@ -64,9 +64,11 @@ export type NormalizeResult =
   | { ok: true; document: Cfdi40Document; issueDate: string }
   | { ok: false; issues: Cfdi40Issue[] };
 
-// XML 1.0 characters minus C0/C1 controls (tab, CR and LF become spaces when collapsed).
+// XML 1.0 characters minus C0/C1 controls (tab, CR and LF become spaces when collapsed) and
+// U+2028/U+2029: some parsers (the approved xmldom) treat them as line ends and others do
+// not, so the cadena original would depend on the parser (Fase 5C.5).
 const allowedCharacters =
-  /^[\t\n\r\u0020-\u007E\u00A0-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]*$/u;
+  /^[\t\n\r\u0020-\u007E\u00A0-\u2027\u202A-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]*$/u;
 
 export const plainName = (value: string) =>
   value

@@ -21,6 +21,9 @@ import type {
   CsdState,
 } from "@/types/csd";
 import type { PacEnvironment } from "@/types/stamping";
+import { certificateBindingFromDer } from "@/lib/cfdi40/certificate-binding";
+import { Cfdi40Error, cfdi40Issue } from "@/lib/cfdi40/errors";
+import type { Cfdi40CertificateBinding } from "@/lib/cfdi40/types";
 
 // Fase 5C.3: CSD custody of one Organization, without session access so it can be tested
 // against PGlite. `actor` must come from a server-validated tenant (services/csd.ts);
@@ -495,4 +498,51 @@ export async function verifyActiveCsdEnvelope(
   } finally {
     pkcs8?.fill(0);
   }
+}
+
+/**
+ * Fase 5C.5: NoCertificado and Certificado for a CFDI, from the PUBLIC certificate of the
+ * active CSD only. Requires the effective state VALID (in force, RFC of the confirmed Fiscal
+ * Profile, the fiscal environment's custody able to serve the key) and that the stored
+ * DER is the certificate the record describes. Selects no envelope column and never opens
+ * the private key: signing is the next gate. Throws Cfdi40Error CSD_NOT_VALID or
+ * CSD_CERTIFICATE_MISMATCH.
+ */
+export async function readActiveCsdCertificateBinding(
+  db: Db,
+  actor: CsdActor,
+  custody: Custody,
+  now = new Date(),
+  env: Env = process.env,
+): Promise<{
+  csdCertificateId: string;
+  environment: PacEnvironment;
+  binding: Cfdi40CertificateBinding;
+}> {
+  const notValid = () =>
+    new Cfdi40Error([
+      cfdi40Issue("CSD_NOT_VALID", "Comprobante/@NoCertificado", "ORBIT"),
+    ]);
+  const state = await readCsdState(db, actor, custody, now, env);
+  if (state.status !== "VALID" || !state.id) throw notValid();
+  const row = await db.csdCertificate.findFirst({
+    where: {
+      organizationId: actor.organizationId,
+      id: state.id,
+      status: "ACTIVE",
+    },
+    select: {
+      environment: true,
+      certificateDer: true,
+      certificateSha256: true,
+      serialNumberHex: true,
+      certificateNumber: true,
+    },
+  });
+  if (!row || row.environment !== custody.environment) throw notValid();
+  return {
+    csdCertificateId: state.id,
+    environment: row.environment,
+    binding: certificateBindingFromDer(row.certificateDer, row, now),
+  };
 }

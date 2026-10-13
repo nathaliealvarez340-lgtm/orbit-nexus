@@ -1,0 +1,156 @@
+{
+  "license": "MIT, Copyright (c) 2026 Lunasoft® (see LICENSE-SW.txt)",
+  "obtainedAt": "2026-10-12",
+  "fixtures": [
+    {
+      "fixture": "sw-ingreso",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CFDI40/CFDI40_Ingreso.xml",
+      "sha256": "93740b26d69f7672e77b19a1b35d272b2d14d9eb25a29674db27d66c597e7329",
+      "cadenaSha256": "65e274aee9b59190d68bdce4bb192ee2f12dfc8b08af24907b4c51c696a3ad8e",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PUE",
+      "moneda": "AMD"
+    },
+    {
+      "fixture": "sw-egreso-nota-credito",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CFDI40/CFDI40_Egreso_NotaDeCredito.xml",
+      "sha256": "8c999335154ec99c17d3f4d0442a55bb71ebf91abbd03584aa8dd64109950f4b",
+      "cadenaSha256": "2b9f1777c491c6b31fa6fb4bcd337f4d6a0f3b048199dc6e69b04a6934750247",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "E",
+      "metodoPago": "PUE",
+      "moneda": "AMD"
+    },
+    {
+      "fixture": "sw-addenda",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/Addenda/CFDI40_Addenda.xml",
+      "sha256": "9d85d7b260f6db25a015091815e6b86f7bc6b94541bc39f15a15ae41831791c6",
+      "cadenaSha256": "7f0710ccead7226e183006041886022da169b6edb3f6d4b2001a9762c12cd167",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PUE",
+      "moneda": "MXN"
+    },
+    {
+      "fixture": "sw-cartaporte20-ingreso-autotransporte",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CartaPorte20/CFDI40_Ingreso_CartaPorte_Autotransporte.xml",
+      "sha256": "194aeb50906c078a1c9df93de24284d94edc1e0f0a2ea56d44ec488d6f0962ee",
+      "cadenaSha256": "3d9b327362fa1ba2f9712507f69e777e8cbb448ed35ec1a257f8db07746b757b",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PPD",
+      "moneda": "AMD"
+    },
+    {
+      "fixture": "sw-cartaporte20-ingreso-aereo",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CartaPorte20/CFDI40_Ingreso_CartaPorte_TransporteAereo.xml",
+      "sha256": "804a0c5cffed4a9cb70d7ccca8e4b02ec76abd41ae3fb749b9f5e0c150bbddf0",
+      "cadenaSha256": "cec060fb742d61f63ad95576535068808186e79f59d453a36ed8f05fad971bef",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PUE",
+      "moneda": "MXN"
+    },
+    {
+      "fixture": "sw-cartaporte20-traslado-ferroviario",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CartaPorte20/CFDI40_Traslado_CartaPorte_TransporteFerroviario.xml",
+      "sha256": "8cdcecd760e38ef2e78b80bb70449edc1bd3a87d085abe5e8f8ea3bb4f0dc727",
+      "cadenaSha256": "5bf26a547f6c8f29e36f7b2d2ccc05bf732a95e3856f294ce2780d605ee23dce",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "T",
+      "metodoPago": null,
+      "moneda": "XXX"
+    },
+    {
+      "fixture": "sw-cartaporte20-traslado-maritimo",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CartaPorte20/CFDI40_Traslado_CartaPorte_TransporteMaritimo.xml",
+      "sha256": "4abe8b88ed98311df153f888066ef803777cd2aaf369416ac47ff17cc43e7d9a",
+      "cadenaSha256": "ce18c90049727df26464357404bae2d58ffc8f89e4772b6937827a9cbbe3df7e",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "T",
+      "metodoPago": null,
+      "moneda": "XXX"
+    },
+    {
+      "fixture": "sw-dotnet-timbrado",
+      "source": "https://github.com/lunasoft/sw-sdk-dotnet/blob/4810ce138096ed2d3086d4155beabd1eaa68441d/Test_SW-sdk-45/Resources/cfdi40_stamp.xml",
+      "sha256": "83aa1cebcdc7eb805c145e2f7a551fd6c475c8b0e02e999e3ee4693c2b8b32b3",
+      "cadenaSha256": "11895dd6d1396451d45672eaf5a061a26372d2348c6a22e4ba4127bd0d33b314",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PUE",
+      "moneda": "MXN"
+    },
+    {
+      "fixture": "sw-php-sellado",
+      "source": "https://github.com/lunasoft/sw-sdk-php/blob/75ff55b1c59783fe497c9525fcac8b1cf2ef205d/Test/Resources/cfdi40_sellado.xml",
+      "sha256": "8cfb8bb28d1ee0b52925d6868e8d5f39582b50715ce29f348c71a5ffbc6fce0e",
+      "cadenaSha256": "7d95fa6f1e20c200378a9666ff933c0b6f582ce63bf280865f83cad9529c02b3",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PPD",
+      "moneda": "MXN"
+    },
+    {
+      "fixture": "sw-python-timbrado",
+      "source": "https://github.com/lunasoft/sw-sdk-python/blob/ab2cbd0475de04cf0a1a9832a45f4a13f30d997e/Test/resources/xml40Stamp.xml",
+      "sha256": "f292ce46854cd027523c4788409415cace8dda0689089df274eee980304dbd26",
+      "cadenaSha256": "4c034e2e9795dd0821a8c6976b369002cfd104842a2d6b181c4b9799e75d7f14",
+      "evidence": "SEAL_VERIFIED",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PPD",
+      "moneda": "AMD"
+    },
+    {
+      "fixture": "sw-pagos20",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/Pagos20/CFDI40_Pago.xml",
+      "sha256": "85b3cd765b747890ea4c94eb795c60564e7cfbb787142d584aaddeb8b60b7652",
+      "cadenaSha256": "211fa34e7ee8b0f8f7b375e66c6cab1c744cee65dea13c7474197abcaf3ecb7b",
+      "evidence": "DUAL_ENGINE",
+      "tipoDeComprobante": "P",
+      "metodoPago": null,
+      "moneda": "XXX"
+    },
+    {
+      "fixture": "sw-nomina12",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/Nomina12/CFDI40_Nomina.xml",
+      "sha256": "7db54f5c421715c729d1e06c1a31f633ff64402b2a241003a0179a8da911c17d",
+      "cadenaSha256": "35d36b1d9bb9b8613b8a1c6e2c8817ebf17137caf678c4fcf2210b92c9813a2a",
+      "evidence": "DUAL_ENGINE",
+      "tipoDeComprobante": "N",
+      "metodoPago": "PPD",
+      "moneda": "MXN"
+    },
+    {
+      "fixture": "sw-comercio-exterior11",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/ComercioExterior11/CFDI40_ComercioExterior.xml",
+      "sha256": "564153cf276a6a3d26cabae13b8d6b961c943338b473943e86c8958683ebc11d",
+      "cadenaSha256": "133670b464d5315087f9ab7eb2d066f82742d8bac778c7a9ac11ae80ebe59f3c",
+      "evidence": "DUAL_ENGINE",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PPD",
+      "moneda": "AMD"
+    },
+    {
+      "fixture": "sw-ingreso-global",
+      "source": "https://github.com/lunasoft/sw-sdk-java/blob/0baf03d191911c0085b1292daee7f0f0b5c07657/src/test/resources/CFDI40/CFDI40/CFDI40_Ingreso_Global.xml",
+      "sha256": "753b23628b12a3688ec02591e63614ac6ca90c4d1f64b2304454dfee75f09c63",
+      "cadenaSha256": "bc041f04f110756dd1cc28b4e07edb745805ca5537a2b080ffbc2c93acc8c54b",
+      "evidence": "DUAL_ENGINE",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PUE",
+      "moneda": "MXN"
+    },
+    {
+      "fixture": "sw-caracteres-especiales",
+      "source": "https://github.com/lunasoft/sw-sdk-dotnet/blob/4810ce138096ed2d3086d4155beabd1eaa68441d/Test_SW-sdk-45/Resources/SpecialCharacters40.xml",
+      "sha256": "dcb0b693a0d66cda17281df857ef794860dcc3c8cc9399ce90742fa5af450976",
+      "cadenaSha256": "c1c0d81a90efc51cbd2280fcc1401a9505e994bde0a4a2057dfa9ea740685720",
+      "evidence": "DUAL_ENGINE",
+      "tipoDeComprobante": "I",
+      "metodoPago": "PPD",
+      "moneda": "AMD"
+    }
+  ]
+}

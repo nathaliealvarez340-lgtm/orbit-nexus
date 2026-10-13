@@ -6,6 +6,7 @@ import {
   readDocument,
 } from "./der";
 import { CsdError } from "./errors";
+import { certificateNumberFromSerial } from "./certificate-number";
 
 // Fase 5C.3 §M steps 5–8 for the public certificate (.cer). Only what node:crypto and the
 // DER structure can demonstrate is checked. csdTypeVerifiedLocally stays false: no
@@ -108,20 +109,8 @@ export function assertCertificateRfc(der: Uint8Array, profileRfc: string) {
   return rfc;
 }
 
-/**
- * §M.8 — UNVERIFIED HYPOTHESIS pending official SAT sources and official test CSD: the
- * certificate serial number is 20 bytes, each an ASCII digit, and those digits are the
- * 20-digit NoCertificado. Any other serial is unsupported (step 8).
- */
-export function certificateNumberFromSerial(serialNumberHex: string) {
-  const hex =
-    serialNumberHex.length % 2 ? "0" + serialNumberHex : serialNumberHex;
-  if (!/^[0-9A-Fa-f]+$/.test(hex)) return null;
-  const bytes = Buffer.from(hex, "hex");
-  if (bytes.length !== 20 || bytes.some((byte) => byte < 0x30 || byte > 0x39))
-    return null;
-  return bytes.toString("latin1");
-}
+// §M.8 (unverified hypothesis): NoCertificado from the serial number; see certificate-number.ts.
+export { certificateNumberFromSerial };
 
 export function assertCertificateNumber(info: CertificateInfo) {
   const number = certificateNumberFromSerial(info.serialNumberHex);

@@ -22,7 +22,11 @@ export type Cfdi40IssueCategory =
   /** Schema validation result or gate. */
   | "XSD"
   /** An unsigned or unverified representation used where a sealed CFDI is required. */
-  | "SEAL";
+  | "SEAL"
+  /** Official XSLT, engine or cadena original that cannot be used (Fase 5C.5). */
+  | "XSLT"
+  /** Public CSD certificate data that cannot be used for the CFDI (Fase 5C.5). */
+  | "CERTIFICATE";
 
 const issues = {
   // Incomplete ORBIT data.
@@ -323,6 +327,48 @@ const issues = {
   SEALED_CFDI_REQUIRED: [
     "SEAL",
     "Solo un CFDI sellado y verificado por ORBIT puede validarse contra el XSD o enviarse al PAC.",
+  ],
+
+  // Cadena original (Fase 5C.5).
+  SAT_XSLT_RESOURCE_MISSING: [
+    "XSLT",
+    "Falta una plantilla XSLT oficial del SAT versionada; la cadena original no se genera.",
+  ],
+  SAT_XSLT_RESOURCE_INTEGRITY_FAILED: [
+    "XSLT",
+    "Una plantilla XSLT oficial no coincide con el hash de su manifiesto; la cadena original no se genera.",
+  ],
+  SAT_XSLT_RESOURCE_NOT_ALLOWED: [
+    "XSLT",
+    "La XSLT pidió un recurso que no es una plantilla oficial versionada; ORBIT no lo descarga ni lo lee.",
+  ],
+  XSLT_ENGINE_UNAVAILABLE: [
+    "XSLT",
+    "No hay un motor XSLT aprobado; la cadena original no se genera.",
+  ],
+  XSLT_TRANSFORM_FAILED: [
+    "XSLT",
+    "La XSLT oficial no pudo ejecutarse sobre el comprobante.",
+  ],
+  ORIGINAL_STRING_INVALID: [
+    "XSLT",
+    "El resultado de la XSLT oficial no tiene la forma de una cadena original (||…||).",
+  ],
+  PRE_SEAL_CFDI_REQUIRED: [
+    "SEAL",
+    "La cadena original solo se genera desde el XML pre-sello que ORBIT construyó con el certificado del CSD.",
+  ],
+  CERTIFICATE_BINDING_INVALID: [
+    "CERTIFICATE",
+    "El certificado no es un certificado de sello utilizable: debe ser X.509 vigente, no de autoridad, RSA, y su número debe corresponder a NoCertificado.",
+  ],
+  CSD_NOT_VALID: [
+    "CERTIFICATE",
+    "No hay un CSD activo y válido (vigente, del RFC del Perfil Fiscal y del entorno fiscal actual) para el comprobante.",
+  ],
+  CSD_CERTIFICATE_MISMATCH: [
+    "CERTIFICATE",
+    "El certificado guardado no corresponde con el registro del CSD (hash, número de serie o NoCertificado).",
   ],
 
   // XSD.

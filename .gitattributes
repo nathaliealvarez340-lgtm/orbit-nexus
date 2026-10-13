@@ -18,3 +18,5 @@ prisma/migrations/202610110001_phase5c3_csd_custody/migration.sql -text
 src/lib/sat/cfdi40/*.json -text
 # Reference unsigned CFDI XML: compared byte for byte (single line, no trailing newline).
 tests/fixtures/cfdi40/*.xml -text
+# Fase 5C.5: cadena original fixtures (CFDI XML and expected cadenas) are compared byte for byte.
+tests/fixtures/cfdi40/cadena/** -text

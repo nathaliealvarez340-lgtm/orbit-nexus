@@ -2,18 +2,22 @@ import type { Cfdi40Catalogs } from "./catalogs";
 import { Cfdi40Error, type Cfdi40Issue } from "./errors";
 import { mapOrbitInvoice } from "./mapper";
 import { normalizeCfdi40 } from "./normalize";
-import { serializeUnsignedCfdi40 } from "./serialize";
+import { assertCertificateBinding } from "./certificate-binding";
+import { serializePreSealCfdi40, serializeUnsignedCfdi40 } from "./serialize";
 import type {
+  Cfdi40CertificateBinding,
   Cfdi40Document,
   OrbitInvoiceForCfdi,
+  PreSealCfdi40Xml,
   UnsignedCfdi40Xml,
 } from "./types";
 import { validateCfdi40 } from "./validate";
 
 // Fase 5C.4 pipeline: ORBIT invoice → mapper → normalizer → validator → serializer.
 // Pure: no database, network, clock or randomness. The caller passes the server instant of
-// emission (never a browser value) and the official catalogs. It stops at the unsigned
-// representation: no cadena original, seal, PAC or ISSUED (FASE5C §15-§16).
+// emission (never a browser value) and the official catalogs. It stops at the unsigned or,
+// with the public certificate of the CSD, the pre-seal representation (Fase 5C.5): the
+// cadena original is generated from it by original-string.ts; no seal, PAC or ISSUED.
 
 export type Cfdi40BuildResult = {
   document: Cfdi40Document;
@@ -41,6 +45,27 @@ export function buildUnsignedCfdi40(
       status: "NOT_VALIDATED",
       reason: "UNSIGNED_REPRESENTATION",
     },
+  };
+}
+
+/**
+ * Fase 5C.5: the same emission build, then the pre-seal XML with the public certificate of
+ * the active VALID CSD (certificateBindingFromDer), which must be in force at `issuedAt`.
+ * Input of generateCfdi40OriginalString; still no Sello.
+ */
+export function buildPreSealCfdi40(
+  invoice: OrbitInvoiceForCfdi,
+  options: {
+    issuedAt: Date;
+    catalogs: Cfdi40Catalogs;
+    certificate: Cfdi40CertificateBinding;
+  },
+): { document: Cfdi40Document; xml: PreSealCfdi40Xml } {
+  const { document } = buildUnsignedCfdi40(invoice, options);
+  assertCertificateBinding(options.certificate, options.issuedAt);
+  return {
+    document,
+    xml: serializePreSealCfdi40(document, options.certificate),
   };
 }
 

@@ -138,13 +138,25 @@ test("official SAT resources are versioned locally with origin, date and SHA-256
   const stored = cfdi40Manifest.resources.filter(
     (r) => typeof r.stored === "string",
   );
-  assert.deepEqual(stored.map((r) => r.name).sort(), [
-    "MatrizDeErrores_CFDI_v40_20260325.xls",
-    "cadenaoriginal_4_0.xslt",
-    "catCFDI.xsd",
-    "cfdv40.xsd",
-    "tdCFDI.xsd",
-  ]);
+  assert.deepEqual(
+    stored
+      .filter((r) => r.kind !== "XSLT_INCLUDE")
+      .map((r) => r.name)
+      .sort(),
+    [
+      "MatrizDeErrores_CFDI_v40_20260325.xls",
+      "cadenaoriginal_4_0.xslt",
+      "catCFDI.xsd",
+      "cfdv40.xsd",
+      "tdCFDI.xsd",
+    ],
+  );
+  // Fase 5C.5: every xsl:include of the cadena original XSLT is versioned under xslt/.
+  assert(
+    stored
+      .filter((r) => r.kind === "XSLT_INCLUDE")
+      .every((r) => r.name.startsWith("xslt/")),
+  );
   for (const r of cfdi40Manifest.resources) {
     assert.match(r.url, /^https?:\/\/(www|omawww)\.sat\.gob\.mx\//, r.name);
     assert.match(r.obtainedAt, /^\d{4}-\d{2}-\d{2}$/);
@@ -169,7 +181,7 @@ test("official SAT resources are versioned locally with origin, date and SHA-256
   )!;
   assert.deepEqual(
     [xslt.xsltVersion, xslt.includesStored, xslt.executed],
-    ["2.0", false, false],
+    ["2.0", true, false],
   );
   assert(xslt.includes!.length > 20);
   // The CFDI module never downloads anything at runtime.

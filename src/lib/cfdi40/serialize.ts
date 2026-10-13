@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
 import { XMLParser } from "fast-xml-parser";
+import { assertCertificateBinding } from "./certificate-binding";
 import { Cfdi40Error, cfdi40Issue } from "./errors";
 import type {
+  Cfdi40CertificateBinding,
   Cfdi40Concept,
   Cfdi40Document,
   Cfdi40Taxes,
   Cfdi40Transfer,
+  PreSealCfdi40Xml,
   UnsignedCfdi40Xml,
 } from "./types";
 import {
@@ -20,8 +23,9 @@ import {
 //   Conceptos, Impuestos; Concepto/Impuestos: Traslados, Retenciones; Comprobante/
 //   Impuestos: Retenciones, Traslados).
 // - Attributes are written in their cfdv40.xsd declaration order; absent optional ones are
-//   omitted (never empty, never invented). Sello, NoCertificado and Certificado keep their
-//   positions in that order for the sealing block but are never written here.
+//   omitted (never empty, never invented). NoCertificado and Certificado are written only in
+//   the pre-seal representation (Fase 5C.5), from the public certificate of the CSD; Sello
+//   is never written here.
 // - After serializing, the XML is parsed back and must reproduce the tree exactly.
 
 export const cfdi40Namespace = "http://www.sat.gob.mx/cfd/4";
@@ -131,8 +135,14 @@ function summary(taxes: Cfdi40Taxes | null) {
   );
 }
 
-/** The element tree of the unsigned comprobante. */
-export function cfdi40Tree(doc: Cfdi40Document): XmlElement {
+/**
+ * The element tree of the comprobante: unsigned, or pre-seal when the public certificate
+ * of the CSD is given (NoCertificado and Certificado in their cfdv40.xsd positions).
+ */
+export function cfdi40Tree(
+  doc: Cfdi40Document,
+  certificate: Cfdi40CertificateBinding | null = null,
+): XmlElement {
   return cfdi(
     "Comprobante",
     [
@@ -145,7 +155,10 @@ export function cfdi40Tree(doc: Cfdi40Document): XmlElement {
       ["Fecha", doc.issuedAt],
       // Sello: sealing block only.
       ["FormaPago", doc.paymentForm],
-      // NoCertificado, Certificado: sealing block only. CondicionesDePago: not modeled.
+      // Pre-seal representation only (Fase 5C.5).
+      ["NoCertificado", certificate?.noCertificado ?? null],
+      ["Certificado", certificate?.certificadoBase64 ?? null],
+      // CondicionesDePago: not modeled.
       ["SubTotal", doc.subtotal],
       ["Descuento", doc.discount],
       ["Moneda", doc.currency],
@@ -224,10 +237,8 @@ export function roundTrips(xml: string, tree: XmlElement) {
   }
 }
 
-export function serializeUnsignedCfdi40(
-  doc: Cfdi40Document,
-): UnsignedCfdi40Xml {
-  const tree = cfdi40Tree(doc);
+/** Serializes a tree and proves the round trip; `written` are the seal attributes present. */
+function write(tree: XmlElement, written: readonly string[]) {
   let xml: string;
   try {
     xml = serializeXml(tree);
@@ -238,20 +249,63 @@ export function serializeUnsignedCfdi40(
       ]);
     throw error;
   }
-  if (
-    tree.attributes.some(([name]) =>
-      (sealAttributes as readonly string[]).includes(name),
-    ) ||
-    !roundTrips(xml, tree)
-  )
+  const present = tree.attributes
+    .map(([name]) => name)
+    .filter((name) => (sealAttributes as readonly string[]).includes(name));
+  if (present.join() !== written.join() || !roundTrips(xml, tree))
     throw new Cfdi40Error([
       cfdi40Issue("XML_ROUND_TRIP_MISMATCH", "Comprobante", "ORBIT"),
     ]);
   const bytes = new Uint8Array(Buffer.from(xml, "utf8"));
   return {
-    stage: "UNSIGNED",
     xml,
     bytes,
     sha256: createHash("sha256").update(bytes).digest("hex"),
   };
+}
+
+export function serializeUnsignedCfdi40(
+  doc: Cfdi40Document,
+): UnsignedCfdi40Xml {
+  return { stage: "UNSIGNED", ...write(cfdi40Tree(doc), []) };
+}
+
+// Pre-seal values are registered when produced here, so a look-alike object (or one changed
+// afterwards) is refused by the cadena original generator at runtime as well.
+const preSealed = new WeakSet<object>();
+
+/**
+ * Fase 5C.5: the comprobante with NoCertificado and Certificado of the CSD and without
+ * Sello, the input of the cadena original. The binding must already come from the public
+ * certificate of the active VALID CSD (certificateBindingFromDer).
+ */
+export function serializePreSealCfdi40(
+  doc: Cfdi40Document,
+  certificate: Cfdi40CertificateBinding,
+): PreSealCfdi40Xml {
+  assertCertificateBinding(certificate);
+  const binding = Object.freeze({
+    noCertificado: certificate.noCertificado,
+    certificadoBase64: certificate.certificadoBase64,
+  });
+  const value = Object.freeze({
+    stage: "PRE_SEAL",
+    ...write(cfdi40Tree(doc, binding), ["NoCertificado", "Certificado"]),
+    certificate: binding,
+  }) as unknown as PreSealCfdi40Xml;
+  preSealed.add(value);
+  return value;
+}
+
+/** True only for a pre-seal XML produced by serializePreSealCfdi40 and unchanged since. */
+export function isPreSealCfdi40(value: unknown): value is PreSealCfdi40Xml {
+  if (!value || typeof value !== "object" || !preSealed.has(value))
+    return false;
+  const candidate = value as PreSealCfdi40Xml;
+  return (
+    candidate.stage === "PRE_SEAL" &&
+    Buffer.from(candidate.bytes).toString("utf8") === candidate.xml &&
+    createHash("sha256").update(candidate.bytes).digest("hex") ===
+      candidate.sha256
+  );
 }

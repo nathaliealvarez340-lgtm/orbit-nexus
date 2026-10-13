@@ -5,6 +5,8 @@
 //     → normalizer → Cfdi40Document     (computed amounts, canonical strings)
 //     → validator  → issues             (catalogs, combinations, limits, facets)
 //     → serializer → UnsignedCfdi40Xml  (deterministic bytes, no NoCertificado/Certificado/Sello)
+//     → pre-seal   → PreSealCfdi40Xml   (+ NoCertificado, Certificado of the VALID CSD; Fase 5C.5)
+//     → official SAT XSLT → Cfdi40OriginalString (exact output; signing is the next gate)
 //
 // Monetary values are decimal strings everywhere; they are parsed only by ./decimal.ts.
 
@@ -216,6 +218,39 @@ export type Cfdi40CertificateBinding = {
   readonly noCertificado: string;
   readonly certificadoBase64: string;
 };
+/** Type-only brand: only serializePreSealCfdi40 produces this representation. */
+declare const preSealBrand: unique symbol;
+/**
+ * Fase 5C.5: the unsigned content plus NoCertificado and Certificado of the active VALID
+ * CSD, in their cfdv40.xsd positions, and no Sello. Input of the cadena original; never
+ * sendable to a PAC and never XSD-valid (Sello is required).
+ */
+export type PreSealCfdi40Xml = {
+  readonly [preSealBrand]: true;
+  readonly stage: "PRE_SEAL";
+  readonly xml: string;
+  readonly bytes: Uint8Array;
+  readonly sha256: string;
+  readonly certificate: Cfdi40CertificateBinding;
+};
+/** Type-only brand: only generateCfdi40OriginalString produces this representation. */
+declare const originalStringBrand: unique symbol;
+/**
+ * Fase 5C.5: the output of the official SAT XSLT, exactly as produced (no trim, no
+ * normalization). `bytes` (UTF-8) is what the future sealing step signs.
+ */
+export type Cfdi40OriginalString = {
+  readonly [originalStringBrand]: true;
+  readonly stage: "ORIGINAL_STRING";
+  readonly value: string;
+  readonly bytes: Uint8Array;
+  readonly sha256: string;
+  /** SHA-256 of the pre-seal XML it was generated from. */
+  readonly preSealSha256: string;
+  readonly noCertificado: string;
+  readonly xslt: { readonly rootSha256: string; readonly engine: string };
+};
+
 /** Type-only brand: no value exists, so no object literal can satisfy SealedCfdi40Xml. */
 declare const sealedBrand: unique symbol;
 /**

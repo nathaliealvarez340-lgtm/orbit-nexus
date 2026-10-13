@@ -1,6 +1,6 @@
 import { X509Certificate, createHash } from "node:crypto";
 import { XMLParser } from "fast-xml-parser";
-import { certificateNumberFromSerial } from "@/lib/csd/certificate";
+import { certificateNumberFromSerial } from "@/lib/csd/certificate-number";
 import { Cfdi40Error, cfdi40Issue } from "./errors";
 import type { Cfdi40CertificateBinding, SealedCfdi40Xml } from "./types";
 

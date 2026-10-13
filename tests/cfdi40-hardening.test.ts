@@ -384,8 +384,21 @@ test("SAT resources: byte-exact manifest, closed directory, contained paths, Git
   const stored = cfdi40Manifest.resources.flatMap((r) =>
     typeof r.stored === "string" ? [{ ...r, stored: r.stored }] : [],
   );
+  const files = (
+    await readdir(cfdi40ResourceDirectory, {
+      recursive: true,
+      withFileTypes: true,
+    })
+  )
+    .filter((entry) => entry.isFile())
+    .map((entry) =>
+      path
+        .relative(cfdi40ResourceDirectory, join(entry.parentPath, entry.name))
+        .split(path.sep)
+        .join("/"),
+    );
   assert.deepEqual(
-    (await readdir(cfdi40ResourceDirectory)).sort(),
+    files.sort(),
     stored.map((r) => r.name).sort(),
     "resources/sat/cfdi40 holds exactly the manifest's files",
   );
