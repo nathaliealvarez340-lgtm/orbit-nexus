@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "@/components/experience/experience.css";
+import { serverExperience } from "@/lib/experience/server";
+import { ExperienceProvider } from "@/components/experience/experience-provider";
 import { WebPrivacy } from "@/components/privacy/web-privacy";
 import { siteOrigin, webDescription } from "@/lib/web-metadata";
 
@@ -34,18 +37,33 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const experience = await serverExperience();
   return (
     <html
-      lang="es"
+      lang={experience.locale}
+      data-theme={experience.theme}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <WebPrivacy>{children}</WebPrivacy>
+        <ExperienceProvider
+          initial={{
+            theme: experience.theme,
+            locale: experience.locale,
+            timezone: experience.timezone,
+            revision:
+              "revision" in experience &&
+              typeof experience.revision === "number"
+                ? experience.revision
+                : undefined,
+          }}
+        >
+          <WebPrivacy>{children}</WebPrivacy>
+        </ExperienceProvider>
       </body>
     </html>
   );

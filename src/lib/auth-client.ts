@@ -1,3 +1,5 @@
 "use client";
 import { createAuthClient } from "better-auth/react";
-export const authClient = createAuthClient();
+import { inferAdditionalFields } from "better-auth/client/plugins";
+import type { getAuth } from "./auth";
+export const authClient = createAuthClient({ plugins: [inferAdditionalFields<ReturnType<typeof getAuth>>()] });

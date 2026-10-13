@@ -1,4 +1,5 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 import Link from "next/link";
 import { LogOut, Plus } from "lucide-react";
 import { useState } from "react";
@@ -14,6 +15,7 @@ export function Topbar({
   organizationId: string;
   memberships: { organization: { id: string; name: string } }[];
 }) {
+  const { t } = useExperience();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -27,7 +29,7 @@ export function Topbar({
           />
           <Link
             href="/dashboard/companies"
-            aria-label="Crear otra organización"
+            aria-label={t("navigation", "createOrganization")}
             className="p-2 text-zinc-500"
           >
             <Plus className="size-4" />
@@ -39,8 +41,8 @@ export function Topbar({
           </span>
           <button
             disabled={busy}
-            aria-label="Cerrar sesión"
-            title="Cerrar sesión"
+            aria-label={t("navigation", "logout")}
+            title={t("navigation", "logout")}
             className="rounded-xl border border-white/10 p-2.5 text-zinc-400 lg:hidden"
             onClick={async () => {
               setBusy(true);
@@ -51,7 +53,7 @@ export function Topbar({
                 // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                 window.location.assign("/login");
               } catch {
-                setError("No se pudo cerrar sesión.");
+                setError(t("navigation", "logoutError"));
                 setBusy(false);
               }
             }}

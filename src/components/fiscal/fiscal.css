@@ -13,37 +13,37 @@
   overflow-wrap: anywhere;
 }
 .fiscal-ui :is(.fiscal-help, .studio-help) {
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   font-size: 12px;
   line-height: 1.65;
   margin-top: 8px;
 }
 .fiscal-ui :is(.fiscal-error, .studio-error) {
-  color: #fda4af;
+  color: var(--orbit-error);
   font-size: 14px;
   line-height: 1.6;
 }
 .fiscal-ui .fiscal-pending {
   padding: 12px;
-  border: 1px solid #ffffff14;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.0784);
   border-radius: 12px;
-  color: #d4d4d8;
+  color: var(--orbit-text-secondary);
   font-size: 12px;
   line-height: 1.65;
   margin-block: 12px;
 }
 .fiscal-ui :is(.fiscal-csf, .fiscal-review, .fiscal-comparison) {
   padding: 20px;
-  border: 1px solid #ffffff14;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.0784);
   border-radius: 16px;
-  background: #ffffff03;
+  background: rgb(var(--orbit-line-rgb) / 0.0118);
   margin-block: 16px;
 }
 .fiscal-ui .fiscal-file-label {
   display: block;
   margin-block: 16px;
   font-size: 14px;
-  color: #d4d4d8;
+  color: var(--orbit-text-secondary);
 }
 .fiscal-ui .fiscal-upload {
   display: flex;
@@ -51,9 +51,9 @@
   gap: 16px;
   padding: 16px;
   margin-block: 16px;
-  border: 1px dashed #ffffff30;
+  border: 1px dashed rgb(var(--orbit-line-rgb) / 0.1882);
   border-radius: 12px;
-  background: #ffffff03;
+  background: rgb(var(--orbit-line-rgb) / 0.0118);
 }
 .fiscal-ui .fiscal-upload-icon {
   flex-shrink: 0;
@@ -84,7 +84,7 @@
   padding-block: 10px;
   font-size: 14px;
   line-height: 1.65;
-  color: #d4d4d8;
+  color: var(--orbit-text-secondary);
   cursor: pointer;
 }
 .fiscal-ui .fiscal-check input {
@@ -108,7 +108,7 @@
   margin-top: 16px;
 }
 .fiscal-ui .fiscal-detected-field {
-  border: 1px solid #ffffff14;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.0784);
   padding: 14px;
   border-radius: 12px;
   display: flex;
@@ -117,7 +117,7 @@
 }
 .fiscal-ui .fiscal-comparison-row {
   padding-block: 16px;
-  border-bottom: 1px solid #ffffff14;
+  border-bottom: 1px solid rgb(var(--orbit-line-rgb) / 0.0784);
 }
 .fiscal-ui .fiscal-comparison-row dl {
   display: grid;
@@ -126,7 +126,7 @@
   margin-block: 12px;
 }
 .fiscal-ui dt {
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   font-size: 12px;
 }
 .fiscal-ui .studio-field {
@@ -135,7 +135,7 @@
 .fiscal-ui .studio-field > label {
   display: block;
   font-size: 14px;
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   margin-bottom: 8px;
 }
 .fiscal-ui .studio-combobox {
@@ -147,8 +147,8 @@
   left: 0;
   right: 0;
   z-index: 30;
-  border: 1px solid #ffffff26;
-  background: #17171d;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.1490);
+  background: var(--orbit-elevated);
   border-radius: 12px;
   box-shadow: 0 12px 28px #0008;
   overflow: hidden;
@@ -173,11 +173,11 @@
 .fiscal-ui
   .studio-options-list
   :is([data-highlighted="true"], [aria-selected="true"]) {
-  background: #ffffff0f;
+  background: rgb(var(--orbit-line-rgb) / 0.0588);
   color: var(--orbit-accent-soft);
 }
 .fiscal-ui .studio-options-list [aria-disabled="true"] {
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   cursor: default;
 }
 @media (max-width: 639px) {

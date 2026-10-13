@@ -1,4 +1,5 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 import {
   Bar,
   BarChart,
@@ -17,6 +18,7 @@ export function SpendChart({
   issued?: boolean;
   currency?: string;
 }) {
+  const { value } = useExperience();
   return (
     <div
       className="h-72 min-w-0"
@@ -32,20 +34,20 @@ export function SpendChart({
           data={data}
           margin={{ top: 12, right: 8, left: 0, bottom: 4 }}
         >
-          <CartesianGrid stroke="rgba(255,255,255,.05)" vertical={false} />
+          <CartesianGrid stroke="rgb(var(--orbit-line-rgb)/.1)" vertical={false} />
           <XAxis
             dataKey="month"
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
             minTickGap={16}
-            tick={{ fill: "#a1a1aa", fontSize: 10 }}
+            tick={{ fill: "var(--orbit-muted)", fontSize: 10 }}
           />
           <YAxis
             width={58}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "#71717a", fontSize: 10 }}
+            tick={{ fill: "var(--orbit-muted)", fontSize: 10 }}
             tickFormatter={(v) =>
               Number(v) >= 1000 ? Number(v) / 1000 + "k" : String(v)
             }
@@ -53,15 +55,15 @@ export function SpendChart({
           <Tooltip
             cursor={{ fill: "rgba(139,92,246,.05)" }}
             contentStyle={{
-              background: "#18181b",
-              border: "1px solid #333",
+              background: "var(--orbit-elevated)", color: "var(--orbit-text)",
+              border: "1px solid rgb(var(--orbit-line-rgb)/.2)",
               borderRadius: 12,
             }}
-            formatter={(value) => [
-              new Intl.NumberFormat("es-MX", {
+            formatter={(amount) => [
+              new Intl.NumberFormat(value.locale, {
                 style: "currency",
                 currency,
-              }).format(Number(value)),
+              }).format(Number(amount)),
               issued ? "Facturación" : "Gasto",
             ]}
           />

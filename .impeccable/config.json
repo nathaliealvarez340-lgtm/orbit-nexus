@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-10-13T14:24:49.030Z",
+        "reason": "Repository AGENTS.md requires preserving current typography; Geist already exists in the baseline and this task does not replace the visual identity."
+      }
+    ]
+  }
+}

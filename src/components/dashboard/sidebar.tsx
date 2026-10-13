@@ -1,4 +1,5 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { PanelLeftClose } from "lucide-react";
@@ -8,6 +9,7 @@ import { LogoutButton } from "./logout-button";
 import { usePathname } from "next/navigation";
 
 export function Sidebar() {
+  const { t } = useExperience();
   const pathname = usePathname();
   const [expandedAt, setExpandedAt] = useState<string | null>(null);
   const expanded = expandedAt === pathname;
@@ -76,7 +78,7 @@ export function Sidebar() {
     <>
       <aside
         ref={panel}
-        aria-label="Navegación de escritorio"
+        aria-label={t("navigation", "desktop")}
         className="orbit-sidebar orbit-nav-panel"
         data-expanded={expanded}
         onMouseOver={showHint}
@@ -94,7 +96,7 @@ export function Sidebar() {
           {expanded && (
             <button
               type="button"
-              aria-label="Contraer menú"
+              aria-label={t("navigation", "collapse")}
               className="orbit-sidebar-collapse"
               onClick={() => {
                 setExpandedAt(null);

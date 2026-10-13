@@ -1,4 +1,5 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 import { useState } from "react";
 export function OrganizationSwitcher({
   memberships,
@@ -7,12 +8,13 @@ export function OrganizationSwitcher({
   memberships: { organization: { id: string; name: string } }[];
   active?: string;
 }) {
+  const { t } = useExperience();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
     <div>
       <select
-        aria-label="Organización activa"
+        aria-label={t("navigation", "activeOrganization")}
         className="input max-w-[48vw] text-sm sm:max-w-64"
         value={active || ""}
         disabled={busy}
@@ -30,14 +32,14 @@ export function OrganizationSwitcher({
             // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.assign("/dashboard");
           } catch {
-            setError("No se pudo cambiar de organización.");
+            setError(t("navigation", "organizationError"));
             setBusy(false);
           }
         }}
       >
         {!active && (
           <option value="" disabled>
-            Seleccionar organización
+            {t("navigation", "chooseOrganization")}
           </option>
         )}
         {memberships.map((m) => (

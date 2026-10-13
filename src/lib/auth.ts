@@ -18,6 +18,12 @@ function createAuth() {
     database: prismaAdapter(getDb(), { provider: "postgresql" }),
     trustedOrigins: [new URL(baseURL).origin],
     logger: { disabled: true },
+    user: {
+      additionalFields: {
+        givenName: { type: "string", required: false, input: true },
+        familyName: { type: "string", required: false, input: true },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 12,
@@ -71,7 +77,30 @@ function createAuth() {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (
-          ctx.path === "/sign-up/email" &&
+          ["/sign-up/email", "/update-user"].includes(ctx.path) &&
+          (ctx.body?.givenName !== undefined ||
+            ctx.body?.familyName !== undefined)
+        ) {
+          const names = z
+            .object({
+              givenName: z.string().trim().min(1).max(100),
+              familyName: z.string().trim().min(1).max(100),
+            })
+            .safeParse(ctx.body);
+          if (!names.success)
+            throw new APIError("BAD_REQUEST", {
+              message: "Revisa el nombre y los apellidos.",
+            });
+          const name = `${names.data.givenName} ${names.data.familyName}`;
+          if (name.length > 100)
+            throw new APIError("BAD_REQUEST", {
+              message: "El nombre completo admite hasta 100 caracteres.",
+            });
+          Object.assign(ctx.body, names.data, { name });
+        }
+        if (
+          (ctx.path === "/sign-up/email" ||
+            (ctx.path === "/update-user" && ctx.body?.name !== undefined)) &&
           !z.string().trim().min(2).max(100).safeParse(ctx.body?.name).success
         )
           throw new APIError("BAD_REQUEST", {

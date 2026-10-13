@@ -1,7 +1,9 @@
 "use client";
 import { useState, type InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { useExperience } from "@/components/experience/experience-provider";
 export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  const { t } = useExperience();
   const [visible, setVisible] = useState(false);
   return (
     <span className="relative block">
@@ -13,7 +15,7 @@ export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
       <button
         type="button"
         className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg p-3"
-        aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+        aria-label={t("common", visible ? "hidePasswordLabel" : "showPasswordLabel")}
         aria-pressed={visible}
         onClick={() => setVisible(!visible)}
       >

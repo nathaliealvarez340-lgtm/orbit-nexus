@@ -1,4 +1,5 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 import Link from "next/link";
 import { ArrowRight, LoaderCircle } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -15,6 +16,7 @@ export function AuthForm({
   mode: "login" | "register";
   returnTo?: "/dashboard/stamping";
 }) {
+  const { t } = useExperience();
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState("");
@@ -30,7 +32,7 @@ export function AuthForm({
           result.error.issues.map((issue) => String(issue.path[0])),
         );
         setError(
-          "Revisa los datos. Usa una contraseña de al menos 12 caracteres, con mayúscula, minúscula y número, y confirma que coincida.",
+          t("auth", "review"),
         );
         return;
       }
@@ -45,6 +47,7 @@ export function AuthForm({
         email: String(fields.email).trim().toLowerCase(),
         password: String(fields.password),
       };
+      e.currentTarget.querySelectorAll<HTMLInputElement>('input[name="password"], input[name="confirm"]').forEach((input) => { input.value = ""; });
       const response =
         mode === "register"
           ? await authClient.signUp.email({
@@ -55,8 +58,8 @@ export function AuthForm({
       if (response.error) {
         setError(
           mode === "login"
-            ? "No se pudo iniciar sesión. Revisa tus datos o intenta más tarde."
-            : "No se pudo crear la cuenta. Revisa tus datos o recupera el acceso si ya tienes una.",
+            ? t("auth", "loginFailed")
+            : t("auth", "failed"),
         );
         return;
       }
@@ -69,7 +72,7 @@ export function AuthForm({
       );
       navigating = true;
     } catch {
-      setError("No se pudo conectar. Intenta nuevamente.");
+      setError(t("auth", "connection"));
     } finally {
       if (!navigating) {
         lock.current = false;
@@ -80,7 +83,7 @@ export function AuthForm({
   return (
     <form onSubmit={submit} className="mt-8 space-y-4" aria-busy={busy}>
       {mode === "register" && (
-        <Field label="Nombre">
+        <Field label={t("common", "givenName")}>
           <input
             name="name"
             autoComplete="name"
@@ -92,7 +95,7 @@ export function AuthForm({
           />
         </Field>
       )}
-      <Field label="Correo">
+      <Field label={t("common", "email")}>
         <input
           name="email"
           autoComplete="email"
@@ -103,7 +106,7 @@ export function AuthForm({
           placeholder="nombre@empresa.com"
         />
       </Field>
-      <Field label="Contraseña">
+      <Field label={t("common", "passwordLabel")}>
         <PasswordInput
           name="password"
           autoComplete={
@@ -120,9 +123,9 @@ export function AuthForm({
       {mode === "register" && (
         <>
           <p className="text-xs text-zinc-500">
-            12 caracteres como mínimo, con mayúscula, minúscula y número.
+            {t("auth", "policy")}
           </p>
-          <Field label="Confirmar contraseña">
+          <Field label={t("common", "confirm")}>
             <PasswordInput
               name="confirm"
               autoComplete="new-password"
@@ -139,7 +142,7 @@ export function AuthForm({
           className="block text-right text-xs text-violet-300"
           href="/forgot-password"
         >
-          Recuperar contraseña
+          {t("auth", "recover")}
         </Link>
       )}
       <Button
@@ -148,10 +151,10 @@ export function AuthForm({
         className="h-11 w-full disabled:opacity-50"
       >
         {busy
-          ? "Un momento…"
+          ? t("auth", "wait")
           : mode === "login"
-            ? "Iniciar sesión"
-            : "Crear cuenta"}
+            ? t("auth", "login")
+            : t("auth", "create")}
         {busy ? (
           <LoaderCircle className="size-4 animate-spin" />
         ) : (

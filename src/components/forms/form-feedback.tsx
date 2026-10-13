@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, type RefObject } from "react";
+import { useExperience } from "@/components/experience/experience-provider";
 // Common live feedback. Field keys come from backend validation, never its raw
 // message/SQL/stack. Existing field descriptions are preserved.
 export function FormFeedback({
@@ -15,6 +16,7 @@ export function FormFeedback({
   fields?: string[];
   scope?: RefObject<HTMLElement | null>;
 }) {
+  const { t } = useExperience();
   const id = useId(),
     feedback = useRef<HTMLParagraphElement>(null);
   const keys = JSON.stringify(fields);
@@ -73,7 +75,7 @@ export function FormFeedback({
               : "idle"
       }
     >
-      {busy ? "Procesando solicitud…" : message}
+      {busy ? t("common", "processing") : message}
     </p>
   );
 }

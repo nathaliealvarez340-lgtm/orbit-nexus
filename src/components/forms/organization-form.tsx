@@ -1,9 +1,15 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormFeedback } from "./form-feedback";
-import { safeFormError, errorFields } from "@/lib/form-errors";
-export function OrganizationForm() {
+import { errorFields } from "@/lib/form-errors";
+export function OrganizationForm({
+  next = "/dashboard",
+}: {
+  next?: "/dashboard" | "/dashboard/fiscal-profile";
+}) {
+  const { t } = useExperience();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [fields, setFields] = useState<string[]>([]);
@@ -29,21 +35,15 @@ export function OrganizationForm() {
           });
           const data = await res.json();
           if (!res.ok) {
-            setError(
-              safeFormError(
-                data,
-                "No pudimos crear la organización. Revisa el nombre o intenta más tarde.",
-              ),
-            );
+            setError(t("errors", "organization"));
             setFields(errorFields(data, ["name"]));
             return;
           }
           // A new workspace must not reuse a previously cached tenant layout.
-          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-          window.location.assign("/dashboard");
+          window.location.assign(next);
           navigating = true;
         } catch {
-          setError("No fue posible conectar.");
+          setError(t("auth", "connection"));
         } finally {
           if (!navigating) {
             lock.current = false;
@@ -53,14 +53,14 @@ export function OrganizationForm() {
       }}
     >
       <label className="block text-sm text-zinc-400">
-        Nombre de empresa u organización
+        {t("onboarding", "organizationName")}
         <input
           className="input mt-2"
           name="name"
           required
           minLength={2}
           maxLength={100}
-          placeholder="Tu organización"
+          placeholder={t("onboarding", "organizationPlaceholder")}
         />
       </label>
       <Button
@@ -68,7 +68,9 @@ export function OrganizationForm() {
         className="w-full disabled:opacity-50"
         disabled={busy}
       >
-        {busy ? "Creando…" : "Crear organización"}
+        {busy
+          ? t("onboarding", "creating")
+          : t("onboarding", "createOrganization")}
       </Button>
       <FormFeedback
         message={error}

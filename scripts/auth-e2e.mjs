@@ -81,7 +81,11 @@ try {
   pass("anonymous dashboard and continuation require login");
   await page.goto("/register");
   await page.getByRole("button", { name: "Rechazar analíticas" }).click();
-  await page.getByLabel("Nombre", { exact: true }).fill("Auth Owner");
+  for (let step = 0; step < 3; step++) await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByRole("radio", { name: "Fundador / CEO", exact: true }).check();
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await page.getByLabel("Nombre", { exact: true }).fill("Auth");
+  await page.getByLabel("Apellidos", { exact: true }).fill("Owner");
   await page.getByLabel("Correo", { exact: true }).fill(email);
   await page.getByLabel("Contraseña", { exact: true }).fill(password);
   await page
@@ -94,7 +98,7 @@ try {
   });
   await page.getByRole("button", { name: "Crear cuenta", exact: true }).click();
   await expect(page.locator("form").getByRole("alert")).toContainText(
-    "Las contraseñas no coinciden",
+    "Revisa tus datos",
   );
   assert.equal(signupCalls, 0);
   assert.equal(await count("User"), 0);
@@ -159,7 +163,8 @@ try {
     form.requestSubmit();
     form.requestSubmit();
   });
-  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 20000 });
+  await expect(page).toHaveURL(/\/dashboard\/fiscal-profile$/, { timeout: 20000 });
+  await page.goto("/dashboard");
   const membership = (
       await query('SELECT * FROM "Membership" WHERE "userId"=$1', [user.id])
     )[0],

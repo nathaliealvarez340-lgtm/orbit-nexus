@@ -213,9 +213,13 @@ enum CompatibilityLevel {
 model User {
   id                String                   @id @default(cuid())
   name              String
+  givenName         String?
+  familyName        String?
   email             String                   @unique
   passwordHash      String?
   preference        UserPreference?
+  communicationPreferences CommunicationPreference[]
+  consentRecords CommunicationConsentRecord[]
   notificationReads NotificationRead[]
   emailVerified     Boolean                  @default(false)
   image             String?
@@ -562,6 +566,71 @@ model UserPreference {
   userId String      @id
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   accent AccentColor @default(PURPLE)
+  theme ThemeMode?
+  locale String? @db.VarChar(35)
+  timezone String? @db.VarChar(64)
+  jobRole ProfessionalRole?
+  revision Int @default(0)
+  onboardingPreferencesCompletedAt DateTime?
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+enum ThemeMode {
+  LIGHT
+  DARK
+}
+
+enum ProfessionalRole {
+  FOUNDER_CEO
+  FINANCE_ACCOUNTING
+  OPERATIONS
+  PRODUCT
+  ENGINEERING_TECH
+  MARKETING_SALES
+  CONSULTANT
+  DESIGNER
+  OTHER
+}
+
+enum CommunicationCategory {
+  NEWS_UPDATES
+  PRODUCT_NEWS
+  COMMERCIAL_OFFERS
+}
+
+enum ConsentDecision {
+  GRANTED
+  REVOKED
+}
+
+enum PreferenceChangeSource {
+  REGISTRATION
+  SETTINGS
+}
+
+model CommunicationPreference {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category CommunicationCategory
+  enabled Boolean @default(false)
+  updatedAt DateTime @default(now()) @updatedAt
+  @@id([userId, category])
+}
+
+// Evidence is append-only; never synthesized from defaults or cookie consent.
+model CommunicationConsentRecord {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  type CommunicationCategory
+  decision ConsentDecision
+  version String
+  contentHash String @db.Char(64)
+  textLocale String @db.VarChar(35)
+  source PreferenceChangeSource
+  jurisdiction String? @db.VarChar(64)
+  recordedAt DateTime @default(now())
+  @@index([userId, type, recordedAt])
 }
 
 model Client {

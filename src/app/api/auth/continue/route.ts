@@ -20,6 +20,9 @@ export async function GET() {
       throw error;
     });
     if (!user) return NextResponse.redirect(new URL("/login", origin));
+    const account = await getDb().user.findUnique({ where: { id: user.id }, select: { givenName: true, familyName: true, preference: { select: { onboardingPreferencesCompletedAt: true } } } });
+    if (account?.givenName && account.familyName && !account.preference?.onboardingPreferencesCompletedAt)
+      return NextResponse.redirect(new URL("/register", origin));
     const memberships = await getDb().membership.findMany({
       where: { userId: user.id },
       select: { organizationId: true },

@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
+import { useExperience } from "@/components/experience/experience-provider";
+import { navigationKeys } from "@/lib/i18n/messages/navigation";
 import { usePathname } from "next/navigation";
 import {
   Bell,
@@ -165,6 +167,9 @@ function NavigationGroups({
   onNavigate,
 }: NavigationProps & { pathname: string }) {
   const id = useId();
+  const { t } = useExperience();
+  const label = (value: string) =>
+    navigationKeys[value] ? t("navigation", navigationKeys[value]) : value;
   const [openModule, setOpenModule] = useState<string | null>(
     () =>
       navigation
@@ -174,7 +179,7 @@ function NavigationGroups({
   );
   return (
     <nav
-      aria-label="Menú principal"
+      aria-label={t("navigation", "menu")}
       className="orbit-navigation"
       data-collapsed={collapsed}
     >
@@ -187,7 +192,7 @@ function NavigationGroups({
         >
           <h2 id={`${id}-${groupIndex}`} className="orbit-nav-heading">
             <group.icon aria-hidden="true" />
-            {group.title}
+            {label(group.title)}
           </h2>
           <ul>
             {group.items.map((item) => {
@@ -197,7 +202,7 @@ function NavigationGroups({
               const content = (
                 <>
                   <item.icon className="orbit-nav-icon" aria-hidden="true" />
-                  <span className="orbit-nav-label">{item.label}</span>
+                  <span className="orbit-nav-label">{label(item.label)}</span>
                 </>
               );
               const toggle = () => {
@@ -210,8 +215,8 @@ function NavigationGroups({
                     {item.href ? (
                       <Link
                         href={item.href}
-                        aria-label={item.label}
-                        data-tooltip={item.label}
+                        aria-label={label(item.label)}
+                        data-tooltip={label(item.label)}
                         aria-current={
                           pathname === item.href ? "page" : undefined
                         }
@@ -227,8 +232,8 @@ function NavigationGroups({
                       <button
                         type="button"
                         className="orbit-nav-item"
-                        aria-label={item.label}
-                        data-tooltip={item.label}
+                        aria-label={label(item.label)}
+                        data-tooltip={label(item.label)}
                         aria-expanded={open}
                         aria-controls={childrenId}
                         onClick={toggle}
@@ -245,7 +250,9 @@ function NavigationGroups({
                       <button
                         type="button"
                         className="orbit-nav-toggle"
-                        aria-label={`Opciones de ${item.label}`}
+                        aria-label={t("navigation", "options", {
+                          label: label(item.label),
+                        })}
                         aria-expanded={open}
                         aria-controls={childrenId}
                         onClick={toggle}
@@ -275,7 +282,7 @@ function NavigationGroups({
                             onClick={onNavigate}
                           >
                             <child.icon aria-hidden="true" />
-                            <span>{child.label}</span>
+                            <span>{label(child.label)}</span>
                           </Link>
                         </li>
                       ))}

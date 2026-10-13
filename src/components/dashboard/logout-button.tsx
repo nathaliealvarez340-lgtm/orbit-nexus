@@ -1,16 +1,18 @@
 "use client";
+import { useExperience } from "@/components/experience/experience-provider";
 import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { LogOut } from "lucide-react";
 export function LogoutButton({ compact = false }: { compact?: boolean }) {
+  const { t } = useExperience();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
     <div>
       <button
         disabled={busy}
-        aria-label="Cerrar sesión"
-        data-tooltip="Cerrar sesión"
+        aria-label={t("navigation", "logout")}
+        data-tooltip={t("navigation", "logout")}
         className="orbit-logout orbit-nav-item"
         onClick={async () => {
           setBusy(true);
@@ -21,13 +23,13 @@ export function LogoutButton({ compact = false }: { compact?: boolean }) {
             // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.assign("/login");
           } catch {
-            setError("No se pudo cerrar sesión.");
+            setError(t("navigation", "logoutError"));
             setBusy(false);
           }
         }}
       >
         <LogOut className="orbit-nav-icon" aria-hidden="true" />
-        {!compact && <span>Cerrar sesión</span>}
+        {!compact && <span>{t("navigation", "logout")}</span>}
       </button>
       {error && (
         <p role="alert" className="orbit-logout-error text-sm text-red-400">

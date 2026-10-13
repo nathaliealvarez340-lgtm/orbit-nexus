@@ -38,7 +38,7 @@
 }
 .csd-help {
   margin-top: 12px;
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   font-size: 14px;
   line-height: 1.7;
   overflow-wrap: anywhere;
@@ -48,17 +48,17 @@
   padding: 14px;
   border: 1px solid #fbbf242e;
   border-radius: 12px;
-  color: #fde68a;
+  color: var(--orbit-warning);
   background: #fbbf2408;
   font-size: 14px;
   line-height: 1.7;
 }
 .csd-badge {
-  border: 1px solid #ffffff24;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.1412);
   padding: 6px 10px;
   border-radius: 10px;
   font-size: 12px;
-  color: #e4e4e7;
+  color: var(--orbit-text-secondary);
 }
 .csd-metadata {
   display: grid;
@@ -67,7 +67,7 @@
   margin-top: 20px;
 }
 .csd-metadata dt {
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   font-size: 12px;
 }
 .csd-metadata dd {
@@ -97,7 +97,7 @@
 .csd-form label {
   display: block;
   font-size: 14px;
-  color: #d4d4d8;
+  color: var(--orbit-text-secondary);
   margin-top: 20px;
 }
 .csd-form .input {
@@ -110,9 +110,9 @@
   max-width: 100%;
 }
 .csd-form input[type="file"]::file-selector-button {
-  border: 1px solid #ffffff24;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.1412);
   border-radius: 8px;
-  background: #ffffff08;
+  background: rgb(var(--orbit-line-rgb) / 0.0314);
   color: white;
   padding: 10px;
   margin-right: 12px;
@@ -133,12 +133,12 @@
 }
 .csd-terms {
   margin-top: 16px;
-  border: 1px solid #ffffff18;
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.0941);
   padding: 16px;
   border-radius: 12px;
   font-size: 14px;
   line-height: 1.7;
-  color: #d4d4d8;
+  color: var(--orbit-text-secondary);
 }
 .csd-terms p {
   margin-top: 12px;
@@ -156,14 +156,14 @@
   text-align: left;
   vertical-align: top;
   padding: 12px 8px;
-  border-bottom: 1px solid #ffffff18;
+  border-bottom: 1px solid rgb(var(--orbit-line-rgb) / 0.0941);
   font-size: 12px;
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
 .csd-history-table th,
 .csd-cell-label {
-  color: #a1a1aa;
+  color: var(--orbit-muted);
   font-weight: 500;
 }
 .csd-cell-label {
@@ -187,7 +187,7 @@
   .csd-history-table tbody tr {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-    border: 1px solid #ffffff18;
+    border: 1px solid rgb(var(--orbit-line-rgb) / 0.0941);
     padding: 12px;
     border-radius: 12px;
     min-width: 0;
@@ -202,7 +202,7 @@
   }
 }
 .csd-destructive {
-  color: #fecaca !important;
+  color: var(--orbit-error) !important;
   border: 1px solid #f871714d !important;
   background: #ef444410 !important;
 }
@@ -214,9 +214,9 @@
   width: calc(100% - 24px);
   max-width: 560px;
   overflow-y: auto;
-  background: #101014;
-  color: #f4f4f5;
-  border: 1px solid #ffffff24;
+  background: var(--orbit-elevated);
+  color: var(--orbit-text);
+  border: 1px solid rgb(var(--orbit-line-rgb) / 0.1412);
   border-radius: 20px;
   padding: 24px;
 }
