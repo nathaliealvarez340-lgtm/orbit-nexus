@@ -6,20 +6,38 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { resolveCustody } from "../src/lib/csd/custody";
 import { csdCustodyTerms } from "../src/lib/csd/custody-terms";
 import { buildPreSealCfdi40 } from "../src/lib/cfdi40/build";
-import { loadCfdi40Catalogs } from "../src/lib/cfdi40/catalogs";
+import {
+  loadCfdi40Catalogs,
+  type Cfdi40Catalogs,
+} from "../src/lib/cfdi40/catalogs";
 import { Cfdi40Error } from "../src/lib/cfdi40/errors";
+import { localIssueDateTime } from "../src/lib/cfdi40/issue-date";
 import {
   configureCsd,
   readActiveCsdCertificateBinding,
   type CsdActor,
 } from "../src/services/csd-store";
 import { startDatabase } from "../scripts/local-database.mjs";
-import { orbitInvoice } from "./fixtures/cfdi40";
+import { issuer, orbitInvoice } from "./fixtures/cfdi40";
 import { syntheticAuthority, syntheticCsd } from "./fixtures/synthetic-csd.mjs";
 
 // Fase 5C.5: NoCertificado/Certificado for the cadena original come from the public
 // certificate of the active VALID CSD only. PGlite + Prisma, never Neon; the certificates
 // are SYNTHETIC (synthetic CA) and do not prove SAT validity. No private key is opened.
+//
+// Deterministic: one fixed instant drives the CSD configuration, every read and the CFDI
+// issue instant, and the draft's fiscal date is derived from that same instant; the CSD has
+// a fixed validity window around it. Nothing here reads the system clock.
+
+const FIXED_ISSUED_AT = new Date("2026-10-12T12:00:00-06:00");
+const validity = {
+  validFrom: new Date("2026-01-01T00:00:00Z"),
+  validTo: new Date("2036-01-01T00:00:00Z"),
+};
+/** Local calendar date at the place of issue (the issuer's postal code), as the rule uses it. */
+const fiscalDateOf = (instant: Date, catalogs: Cfdi40Catalogs) =>
+  localIssueDateTime(instant, catalogs.postalCode(issuer.postalCode)!.timeZone)!
+    .date;
 
 const authority = syntheticAuthority();
 const env = {
@@ -57,7 +75,7 @@ const envelopeColumns = [
 
 let database: Awaited<ReturnType<typeof startDatabase>>;
 let prisma: PrismaClient;
-const material = syntheticCsd(authority, { rfc });
+const material = syntheticCsd(authority, { rfc, ...validity });
 const sql = (query: string, params: unknown[] = []) =>
   database.db.query(query, params);
 const codeOf = async (promise: Promise<unknown>) => {
@@ -99,7 +117,7 @@ before(async () => {
       expectedActiveCsdId: null,
     },
     custody,
-    undefined,
+    FIXED_ISSUED_AT,
     env,
   );
 });
@@ -146,7 +164,7 @@ test("the binding comes from the public certificate of the active VALID CSD, nev
       db,
       actor,
       custody,
-      undefined,
+      FIXED_ISSUED_AT,
       env,
     );
     assert.equal(result.environment, "SANDBOX");
@@ -170,23 +188,44 @@ test("the binding comes from the public certificate of the active VALID CSD, nev
       ),
     );
   }
-  // It is directly usable for the pre-seal XML of the same issuer.
+  // It is directly usable for the pre-seal XML of the same issuer, issued at the fixed
+  // instant, for a draft whose fiscal date is derived from that same instant.
   const { binding } = await readActiveCsdCertificateBinding(
     prisma,
     owner,
     custody,
-    undefined,
+    FIXED_ISSUED_AT,
     env,
   );
-  const { xml } = buildPreSealCfdi40(
-    orbitInvoice([{ quantity: "1", unitPrice: "100" }]),
-    {
-      issuedAt: new Date(),
-      catalogs: await loadCfdi40Catalogs(),
-      certificate: binding,
-    },
-  );
+  const catalogs = await loadCfdi40Catalogs();
+  const fiscalDate = fiscalDateOf(FIXED_ISSUED_AT, catalogs);
+  assert.equal(fiscalDate, "2026-10-12");
+  const invoice = orbitInvoice([{ quantity: "1", unitPrice: "100" }], {
+    invoiceDate: fiscalDate,
+  });
+  const { xml } = buildPreSealCfdi40(invoice, {
+    issuedAt: FIXED_ISSUED_AT,
+    catalogs,
+    certificate: binding,
+  });
   assert(xml.xml.includes(` NoCertificado="${material.certificateNumber}"`));
+  assert(xml.xml.includes(' Fecha="2026-10-12T12:00:00"'));
+
+  // Negative, unchanged rule: issued on another local day than the draft's fiscal date, the
+  // same build fails with ISSUE_DATE_DIFFERS_FROM_DRAFT (the certificate is still in force).
+  const nextDay = new Date(FIXED_ISSUED_AT.getTime() + 24 * 3600 * 1000);
+  assert.notEqual(fiscalDateOf(nextDay, catalogs), fiscalDate);
+  assert.throws(
+    () =>
+      buildPreSealCfdi40(invoice, {
+        issuedAt: nextDay,
+        catalogs,
+        certificate: binding,
+      }),
+    (error) =>
+      error instanceof Cfdi40Error &&
+      error.issues.some((i) => i.code === "ISSUE_DATE_DIFFERS_FROM_DRAFT"),
+  );
 });
 
 test("no binding without an active VALID CSD of this Organization and environment", async () => {
@@ -199,13 +238,13 @@ test("no binding without an active VALID CSD of this Organization and environmen
         prisma,
         actor,
         options.c ?? custody,
-        options.now,
+        options.now ?? FIXED_ISSUED_AT,
         env,
       ),
     );
   assert.equal(await read(other), "CSD_NOT_VALID", "another tenant has none");
   assert.equal(
-    await read(owner, { now: new Date(Date.now() + 400 * 24 * 3600 * 1000) }),
+    await read(owner, { now: new Date("2036-02-01T00:00:00Z") }),
     "CSD_NOT_VALID",
     "expired",
   );

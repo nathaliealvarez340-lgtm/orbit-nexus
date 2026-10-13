@@ -1,0 +1,74 @@
+{
+  "generatedAt": "2026-10-13T03:43:03.648Z",
+  "algorithm": "RSA-SHA256 PKCS#1 v1.5 over the UTF-8 cadena original",
+  "certificate": {
+    "file": "synthetic-seal-vector.cer",
+    "sha256": "4de2a96d5c3f9114ecebe1c350f70557452e3ae29495f6bc782dcb736bdd4b76",
+    "noCertificado": "30001000000000000001",
+    "rfc": "SCA010101AB1",
+    "validFrom": "Jan  1 00:00:00 2026 GMT",
+    "validTo": "Jan  1 00:00:00 2036 GMT",
+    "keyBits": 2048,
+    "issuer": "synthetic CA (not SAT)"
+  },
+  "signingMaterial": "RSA 2048 generated in memory by node:crypto for this vector; written only to a temporary directory outside the repository for OpenSSL, then deleted; not kept anywhere",
+  "sellos": "Produced by the OpenSSL command line (openssl dgst -sha256 -sign). Microsoft .NET CNG (RSACng.SignData, Pkcs1) and node:crypto produced byte-identical signatures; OpenSSL and .NET verified each with PKCS#1 v1.5 and rejected it as PSS.",
+  "tools": {
+    "openssl": "OpenSSL 3.5.7 9 Jun 2026 (Library: OpenSSL 3.5.7 9 Jun 2026)",
+    "dotnet": ".NET Framework 4.8.9345.0",
+    "node": "v24.14.1"
+  },
+  "cadenas": "tests/fixtures/cfdi40/cadena/orbit/*.cadena.txt (DUAL_ENGINE references); the cadena omits Certificado, so the same NoCertificado gives the same cadena",
+  "fixtures": [
+    {
+      "fixture": "ingreso-pue-iva16",
+      "cadenaSha256": "eae9c076e5301400f8eba98361d0cf67aee269eddbee58ccbe041b3ad8578275",
+      "selloSha256": "1364a11638f69e741d842cef644bb1438d7dd1ca5e5937a4759fffeae82d7d84"
+    },
+    {
+      "fixture": "ingreso-ppd",
+      "cadenaSha256": "48eea7704b5cf69aad8f9a4fbbc7c44006ecff098fac203d9079431cfad55d67",
+      "selloSha256": "77d4e4894b8fab2faa2f9078957a8e8d23e48e0ba167393b9e436d8b3e5facb2"
+    },
+    {
+      "fixture": "ingreso-exento",
+      "cadenaSha256": "9911e6efad495fd37bb45a69fde2933d34ce5e358ff1d1e9fbb1b7551f049f29",
+      "selloSha256": "24c2a6b802001bb5f69d2ba70231034d1b0fde29d91bf8525f154699a3c0543b"
+    },
+    {
+      "fixture": "ingreso-descuento",
+      "cadenaSha256": "ff04f7b5c0f695f448b52a9cca81b63859ea45ed70ea0098242f9c419b506ebf",
+      "selloSha256": "251539ae04e96bb28a3d73ec9662b6bd9777d660e44692b7f803d789d3e86c93"
+    },
+    {
+      "fixture": "ingreso-multiples-conceptos",
+      "cadenaSha256": "8bea01794b0ddf18d38dabce9e7d52494ccbb2113b0fb4130ae90c281c7795ee",
+      "selloSha256": "e0d4482c45817ecc27fd0af2523a56da348284138713a655498d4dc0736541e6"
+    },
+    {
+      "fixture": "ingreso-retenciones-persona-moral",
+      "cadenaSha256": "8431d4337e71155d1e9e81785c29152290aabdcbed62dc64ed272ad06db59f5c",
+      "selloSha256": "aa0515148274d774450da1d1f6df12de19c21b2b1cb064ac6d1e46fd2e62861f"
+    },
+    {
+      "fixture": "ingreso-unicode-escape",
+      "cadenaSha256": "00ca745b32e8d38d959822a3215c5987aa7957bae1c7b61325fe88114c424635",
+      "selloSha256": "d219f212d0128910d3244e85458c8bcdd06b362b9165043fad1ed4c00721193a"
+    },
+    {
+      "fixture": "ingreso-usd-tipo-cambio",
+      "cadenaSha256": "49b713fa0e57c73a8f198bb89da3df140bdc005180af47bfb6f9e09ed15f631a",
+      "selloSha256": "a96e013654786562d918b6b9860e0cfe6b4aa45eea8b6eb1229cfb3808609273"
+    },
+    {
+      "fixture": "ingreso-rfc-generico-nacional",
+      "cadenaSha256": "1057c1726f2bd4897df65c675ab92f055154457814f4c7fa1d8d11873c025968",
+      "selloSha256": "cf9a0b3407d5494df0f1a08d1c3f3026980ece978d163d7958051c52e739cb67"
+    },
+    {
+      "fixture": "ingreso-persona-fisica",
+      "cadenaSha256": "e963e775a1b69aa61fba577a80d22a3ef5e40ca31c01568fc471a049e7f08871",
+      "selloSha256": "b43071053c52368dcd707dea6aa1f0599ecc519d81bd72b4f50e0ad79e063868"
+    }
+  ]
+}

@@ -87,6 +87,20 @@ export const auditCatalog = {
     targetType: "CsdCertificate",
     metadata: ["certificateNumber", "reason"],
   },
+  // Fase 5C.6: seal of a CFDI with the custodied CSD. Only ids, the fiscal environment and a
+  // result code: never the Sello, cadena original, XML, certificate or key material.
+  "cfdi.sealed": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: ["certificateId", "environment"],
+    identifiers: ["certificateId"],
+  },
+  "cfdi.seal.failed": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: ["errorCode", "certificateId", "environment"],
+    identifiers: ["certificateId"],
+  },
   "invoice.stamp_authorized": {
     scope: "TENANT",
     targetType: "StampedInvoice",

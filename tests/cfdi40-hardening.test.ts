@@ -366,9 +366,18 @@ test("only a CFDI sealed and registered by ORBIT can reach the XSD gate or a PAC
     reason: "NOT_SEALED_BY_ORBIT",
   });
 
-  // Nothing in this phase registers or produces a sealed CFDI.
+  // Fase 5C.6: exactly one place registers a sealed CFDI, createSealedCfdi40, and only after
+  // the Sello verification that throws CFDI_SEAL_VERIFICATION_FAILED.
   const source = await readFile("src/lib/cfdi40/sealed.ts", "utf8");
-  assert(!/registry\.add\(/.test(source));
+  assert.equal(source.match(/registry\.add\(/g)?.length, 1);
+  const constructor = source.slice(
+    source.indexOf("export function createSealedCfdi40("),
+  );
+  assert(
+    constructor.lastIndexOf('"CFDI_SEAL_VERIFICATION_FAILED"') <
+      constructor.indexOf("registry.add(") &&
+      constructor.indexOf('"CFDI_SEAL_VERIFICATION_FAILED"') > 0,
+  );
   for (const file of await readdir("src/lib/cfdi40"))
     if (!["types.ts", "sealed.ts"].includes(file))
       assert(

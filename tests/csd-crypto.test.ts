@@ -1179,11 +1179,21 @@ test("leak review: CSD code never logs, decrypts only in the vault, signs only t
   assert.deepEqual(users(/\bverifyActiveCsdEnvelope\b/), [
     "src/services/csd-store.ts",
   ]);
-  // The only signature is the step 12 challenge with the uploaded key, before storage.
+  // Signatures: the step 12 challenge with the uploaded key, before storage, and (Fase 5C.6)
+  // the CFDI seal, only in lib/csd/signing.ts with the padding set explicitly, reached only
+  // through the signing service.
   assert.deepEqual(
     users(/\b(createSign|sign)\(/).filter((f) => f.includes("csd")),
-    ["src/lib/csd/private-key.ts"],
+    ["src/lib/csd/private-key.ts", "src/lib/csd/signing.ts"],
   );
+  const signing = sources.find((s) => s.file === "src/lib/csd/signing.ts")!;
+  assert.match(signing.text, /padding: cfdiSealAlgorithm\.padding/);
+  assert.match(signing.text, /padding: constants\.RSA_PKCS1_PADDING/);
+  assert.doesNotMatch(signing.text, /RSA_PKCS1_PSS_PADDING|saltLength/);
+  assert.deepEqual(users(/\bsignWithCustodiedKey\(/), [
+    "src/lib/csd/signing.ts",
+    "src/services/csd-signing.ts",
+  ]);
   for (const path of [
     "/dashboard/stamping",
     "/api/csd",

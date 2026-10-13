@@ -442,12 +442,9 @@ prueba de dependencias para que la primera ruta que lo use compile.
 ## 15. Siguiente gate: firma CSD
 
 1. ~~Autorizar e instalar el motor (§6) y activar la prueba con el motor real.~~ Hecho.
-2. `CsdVault.sign(organizationId, cadena.bytes)`: abre la llave en memoria (custodia 5C.3),
-   RSA-SHA256 PKCS#1 v1.5, Base64, sobrescribe buffers, sin caché.
-3. Insertar `Sello` en el XML pre-sello (misma serialización), verificar localmente el sello
-   con la llave pública del certificado y comparar que el XML no cambió; registrar en el
-   registro privado de `sealed.ts`.
-4. Gate XSD sobre el XML sellado; después, autorización por factura y PAC (FASE5C3 §AA.9–12).
+2. ~~Firma con el CSD custodiado, Sello en el XML pre-sello y verificación local.~~ Hecho en
+   Fase 5C.6: `docs/tasks/FASE5C6-CSD-SIGNING.md`.
+3. Siguiente: autorización por factura → sello → XSD → PAC (FASE5C6 §13).
 
 ## 16. Pruebas
 

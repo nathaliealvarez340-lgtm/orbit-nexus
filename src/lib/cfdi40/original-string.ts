@@ -6,9 +6,9 @@ import type { Cfdi40OriginalString, PreSealCfdi40Xml } from "./types";
 
 // Fase 5C.5: cadena original = the official SAT XSLT (cadenaoriginal_4_0.xslt and its
 // includes, versioned and hash-checked) executed on the pre-seal XML (FASE5C3 §AA.4). ORBIT
-// never reimplements the XSLT rules. The engine is a port: until a dependency is approved
-// (FASE5C3 §AA.5.3, docs/tasks/FASE5C5-CADENA-ORIGINAL.md) the default engine is
-// unavailable and every request fails closed. Pure: no database, network, files or clock.
+// never reimplements the XSLT rules. The engine is a port; the approved one is wired in
+// ./xslt-engine.ts (docs/tasks/FASE5C5-CADENA-ORIGINAL.md §6) and `unavailableXsltEngine`
+// fails closed. Pure: no database, network, files or clock.
 
 const fail = (code: Cfdi40IssueCode) =>
   new Cfdi40Error([cfdi40Issue(code, "CadenaOriginal", "ORBIT")]);
@@ -87,6 +87,26 @@ export function compileCfdi40Xslt(
 /** "||" + fields separated by "|" + "||", on one line (the SAT XSLT normalizes spaces). */
 const originalStringShape = /^\|\|[^\r\n]*\|\|$/;
 
+// Cadenas are registered when produced here, so the sealing step (Fase 5C.6) refuses a
+// look-alike object, or one changed afterwards, at runtime as well as by type.
+const generated = new WeakSet<object>();
+
+/** True only for a cadena produced by generateCfdi40OriginalString and unchanged since. */
+export function isCfdi40OriginalString(
+  value: unknown,
+): value is Cfdi40OriginalString {
+  if (!value || typeof value !== "object" || !generated.has(value))
+    return false;
+  const candidate = value as Cfdi40OriginalString;
+  return (
+    candidate.stage === "ORIGINAL_STRING" &&
+    originalStringShape.test(candidate.value) &&
+    Buffer.from(candidate.bytes).toString("utf8") === candidate.value &&
+    createHash("sha256").update(candidate.bytes).digest("hex") ===
+      candidate.sha256
+  );
+}
+
 /**
  * The cadena original of a pre-seal CFDI, exactly as the official XSLT produces it: no
  * trimming, normalization or re-encoding. Throws PRE_SEAL_CFDI_REQUIRED for anything not
@@ -116,7 +136,7 @@ export function generateCfdi40OriginalString(
   )
     throw fail("ORIGINAL_STRING_INVALID");
   const bytes = new Uint8Array(Buffer.from(value, "utf8"));
-  return Object.freeze({
+  const result = Object.freeze({
     stage: "ORIGINAL_STRING",
     value,
     bytes,
@@ -128,6 +148,8 @@ export function generateCfdi40OriginalString(
       engine: dependencies.engine.id,
     }),
   }) as unknown as Cfdi40OriginalString;
+  generated.add(result);
+  return result;
 }
 
 /** A DOMParser that throws on malformed XML (xmldom: onError rethrows errors). */
@@ -147,10 +169,10 @@ export type TradikXsltModule = {
 };
 
 /**
- * Adapter for @tradik/xslt-processor (candidate, NOT approved: see the dependency gate).
+ * Adapter for @tradik/xslt-processor (approved in Fase 5C.5; wired in ./xslt-engine.ts).
  * Its XsltEngine runs the version="2.0" SAT stylesheets with the XSLT 1.0 engine in
  * forwards-compatible mode; includes come only from `loadInclude` and document() is
- * refused. Wiring it needs the dependency in package.json, which this phase does not add.
+ * refused.
  */
 export function tradikXsltEngine(
   module: TradikXsltModule,

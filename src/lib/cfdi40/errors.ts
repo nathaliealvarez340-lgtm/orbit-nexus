@@ -26,7 +26,9 @@ export type Cfdi40IssueCategory =
   /** Official XSLT, engine or cadena original that cannot be used (Fase 5C.5). */
   | "XSLT"
   /** Public CSD certificate data that cannot be used for the CFDI (Fase 5C.5). */
-  | "CERTIFICATE";
+  | "CERTIFICATE"
+  /** The CSD private key cannot be used to sign now: role, custody or key (Fase 5C.6). */
+  | "SIGNING";
 
 const issues = {
   // Incomplete ORBIT data.
@@ -369,6 +371,50 @@ const issues = {
   CSD_CERTIFICATE_MISMATCH: [
     "CERTIFICATE",
     "El certificado guardado no corresponde con el registro del CSD (hash, número de serie o NoCertificado).",
+  ],
+
+  // Sello (Fase 5C.6). Before the private key is opened every condition is re-checked; any
+  // failure stops there and the key is never decrypted.
+  CSD_NOT_CONFIGURED: [
+    "CERTIFICATE",
+    "La organización no tiene un CSD activo para sellar el comprobante.",
+  ],
+  CSD_EXPIRED: [
+    "CERTIFICATE",
+    "El CSD activo no está vigente en el instante de sellado; no se abrió la llave privada.",
+  ],
+  CSD_ENVIRONMENT_MISMATCH: [
+    "CERTIFICATE",
+    "El CSD no corresponde al entorno fiscal actual (en SANDBOX solo se aceptan certificados de prueba demostrados); no se abrió la llave privada.",
+  ],
+  CSD_RFC_MISMATCH: [
+    "CERTIFICATE",
+    "El RFC del CSD no corresponde al emisor del comprobante; no se abrió la llave privada.",
+  ],
+  CSD_FORBIDDEN: [
+    "SIGNING",
+    "Solo un propietario o administrador puede sellar con el CSD de la organización.",
+  ],
+  CSD_SERVICE_UNAVAILABLE: [
+    "SIGNING",
+    "La custodia del CSD no está disponible para el entorno fiscal actual (PRODUCTION exige un proveedor KMS/HSM); no se selló.",
+  ],
+  CSD_KEY_UNAVAILABLE: [
+    "SIGNING",
+    "La llave privada del CSD no puede abrirse con la custodia configurada; no se selló.",
+  ],
+  CSD_KEY_INTEGRITY_FAILED: [
+    "SIGNING",
+    "La llave privada cifrada del CSD no superó su verificación de integridad; no se selló.",
+  ],
+  CSD_KEY_MISMATCH: [
+    "SIGNING",
+    "La llave privada custodiada no corresponde al certificado del CSD; no se selló.",
+  ],
+  CFDI_SEAL_FAILED: ["SIGNING", "No se pudo generar el sello del comprobante."],
+  CFDI_SEAL_VERIFICATION_FAILED: [
+    "SEAL",
+    "El sello no se verificó con el certificado sobre la cadena original del XML; el comprobante no se considera sellado.",
   ],
 
   // XSD.

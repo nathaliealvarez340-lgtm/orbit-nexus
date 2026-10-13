@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { PacEnvironment } from "@/types/stamping";
+import { decipherAll } from "./decipher";
 
 // Fase 5C.3 §G: the KEK (master key) wraps one random data key (DEK) per CSD and never
 // lives in the database. Providers are chosen explicitly per FISCAL environment (not per
@@ -129,10 +130,7 @@ export function envKeyProvider(env: Env = process.env): CsdKeyProvider {
         decipher.setAAD(aad);
         decipher.setAuthTag(wrapped.subarray(44));
         try {
-          return Buffer.concat([
-            decipher.update(wrapped.subarray(12, 44)),
-            decipher.final(),
-          ]);
+          return decipherAll(decipher, wrapped.subarray(12, 44));
         } catch {
           throw new KeyProviderError("INTEGRITY");
         }

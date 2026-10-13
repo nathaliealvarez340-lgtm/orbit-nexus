@@ -280,8 +280,8 @@ catálogos, y persistir el instante usado.
 | Representación | Contiene | Producida por |
 |---|---|---|
 | `UnsignedCfdi40Xml` (`stage: "UNSIGNED"`) | Contenido fiscal; sin los tres atributos | Este bloque |
-| Pre-sello (futuro) | + `NoCertificado` y `Certificado` del CSD `VALID`; sin `Sello`. Entrada de la cadena original | Bloque de sello |
-| `SealedCfdi40Xml` (`stage: "SEALED"`) | + `Sello` verificado localmente | Bloque de sello (ninguna función lo produce hoy) |
+| Pre-sello (Fase 5C.5) | + `NoCertificado` y `Certificado` del CSD `VALID`; sin `Sello`. Entrada de la cadena original | Bloque de sello |
+| `SealedCfdi40Xml` (`stage: "SEALED"`) | + `Sello` verificado localmente | Fase 5C.6: solo `createSealedCfdi40` (`docs/tasks/FASE5C6-CSD-SIGNING.md`) |
 
 Nunca hay placeholders. TypeScript impide usar un XML sin sellar donde se exige uno sellado
 (prueba con `@ts-expect-error`), y en tiempo de ejecución `sealed.ts` rechaza todo lo que no

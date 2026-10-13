@@ -325,6 +325,7 @@ test("xsl:include resolves only to allowlisted official resources: no files, net
 test("the SAT XSLT set uses only XSLT 1.0 instructions and two XPath functions (re-audit if it changes)", () => {
   const instructions = new Set<string>();
   const functions = new Set<string>();
+  let outputs = 0;
   for (const { text } of bundleJson.resources) {
     for (const [, name] of text.matchAll(/<xsl:([A-Za-z-]+)/g))
       instructions.add(name);
@@ -335,12 +336,16 @@ test("the SAT XSLT set uses only XSLT 1.0 instructions and two XPath functions (
         functions.add(fn);
     assert(!/\s(as|use-when|xpath-default-namespace)="/.test(text));
     // Where a stylesheet declares its output, it is plain UTF-8 text.
-    for (const [declaration] of text.matchAll(/<xsl:output[^>]*>/g))
+    for (const [declaration] of text.matchAll(/<xsl:output\b[^>]*>/g)) {
+      outputs++;
       assert.equal(
         declaration,
         '<xsl:output method="text" version="1.0" encoding="UTF-8" indent="no"/>',
       );
+    }
   }
+  // At least the root declares its output (the check above is not vacuous).
+  assert(outputs >= 1, "xsl:output declarations checked");
   assert.deepEqual([...instructions].sort(), [
     "apply-templates",
     "call-template",

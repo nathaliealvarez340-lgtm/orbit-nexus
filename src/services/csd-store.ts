@@ -69,7 +69,7 @@ async function confirmedProfileRfc(
 
 /** §C.2: effective state, recomputed on every read; only VALID can sign. */
 export async function readCsdState(
-  db: Db,
+  db: Pick<Db, "csdCertificate" | "csdPrivateKey" | "fiscalProfile">,
   actor: CsdActor,
   custody: Custody,
   now = new Date(),

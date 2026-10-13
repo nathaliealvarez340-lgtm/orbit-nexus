@@ -20,3 +20,5 @@ src/lib/sat/cfdi40/*.json -text
 tests/fixtures/cfdi40/*.xml -text
 # Fase 5C.5: cadena original fixtures (CFDI XML and expected cadenas) are compared byte for byte.
 tests/fixtures/cfdi40/cadena/** -text
+# Fase 5C.6: seal test vector (certificate DER and Base64 sellos), compared byte for byte.
+tests/fixtures/cfdi40/seal/** -text

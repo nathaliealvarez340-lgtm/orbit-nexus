@@ -25,7 +25,7 @@ import {
 // - Attributes are written in their cfdv40.xsd declaration order; absent optional ones are
 //   omitted (never empty, never invented). NoCertificado and Certificado are written only in
 //   the pre-seal representation (Fase 5C.5), from the public certificate of the CSD; Sello
-//   is never written here.
+//   only by serializeSealedCfdi40 (Fase 5C.6), into that same pre-seal tree.
 // - After serializing, the XML is parsed back and must reproduce the tree exactly.
 
 export const cfdi40Namespace = "http://www.sat.gob.mx/cfd/4";
@@ -271,8 +271,9 @@ export function serializeUnsignedCfdi40(
 }
 
 // Pre-seal values are registered when produced here, so a look-alike object (or one changed
-// afterwards) is refused by the cadena original generator at runtime as well.
-const preSealed = new WeakSet<object>();
+// afterwards) is refused by the cadena original generator at runtime as well. The tree they
+// were written from is kept so the sealed XML is written from the very same tree.
+const preSealed = new WeakMap<object, XmlElement>();
 
 /**
  * Fase 5C.5: the comprobante with NoCertificado and Certificado of the CSD and without
@@ -288,12 +289,13 @@ export function serializePreSealCfdi40(
     noCertificado: certificate.noCertificado,
     certificadoBase64: certificate.certificadoBase64,
   });
+  const tree = cfdi40Tree(doc, binding);
   const value = Object.freeze({
     stage: "PRE_SEAL",
-    ...write(cfdi40Tree(doc, binding), ["NoCertificado", "Certificado"]),
+    ...write(tree, ["NoCertificado", "Certificado"]),
     certificate: binding,
   }) as unknown as PreSealCfdi40Xml;
-  preSealed.add(value);
+  preSealed.set(value, tree);
   return value;
 }
 
@@ -308,4 +310,58 @@ export function isPreSealCfdi40(value: unknown): value is PreSealCfdi40Xml {
     createHash("sha256").update(candidate.bytes).digest("hex") ===
       candidate.sha256
   );
+}
+
+/** Emisor/@Rfc exactly as written in a pre-seal XML produced here; null otherwise. */
+export function preSealIssuerRfc(preSeal: PreSealCfdi40Xml): string | null {
+  const tree = isPreSealCfdi40(preSeal) ? preSealed.get(preSeal) : undefined;
+  const issuer = tree?.children.find((child) => child.name === "cfdi:Emisor");
+  return issuer?.attributes.find(([name]) => name === "Rfc")?.[1] ?? null;
+}
+
+const canonicalBase64 =
+  /^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+/**
+ * Fase 5C.6: the sealed XML is the pre-seal tree with one attribute added, Sello, in its
+ * cfdv40.xsd position (after Fecha, before FormaPago). Nothing fiscal is recomputed: the
+ * result must equal the pre-seal bytes with exactly ` Sello="…"` inserted, or it fails.
+ * Writing these bytes does not make a CFDI sealed; only ./sealed.ts registers one, after
+ * verifying the Sello.
+ */
+export function serializeSealedCfdi40(
+  preSeal: PreSealCfdi40Xml,
+  sello: string,
+) {
+  const tree = isPreSealCfdi40(preSeal) ? preSealed.get(preSeal) : undefined;
+  if (!tree)
+    throw new Cfdi40Error([
+      cfdi40Issue("PRE_SEAL_CFDI_REQUIRED", "Comprobante", "ORBIT"),
+    ]);
+  const fecha = tree.attributes.findIndex(([name]) => name === "Fecha");
+  if (!canonicalBase64.test(sello) || fecha < 0)
+    throw new Cfdi40Error([
+      cfdi40Issue("CFDI_SEAL_FAILED", "Comprobante/@Sello", "ORBIT"),
+    ]);
+  const sealedTree: XmlElement = {
+    ...tree,
+    attributes: [
+      ...tree.attributes.slice(0, fecha + 1),
+      ["Sello", sello],
+      ...tree.attributes.slice(fecha + 1),
+    ],
+  };
+  const result = write(sealedTree, ["Sello", "NoCertificado", "Certificado"]);
+  const marker = ` Sello="${sello}"`;
+  const at = result.xml.indexOf(marker);
+  if (
+    at < 0 ||
+    result.xml.indexOf(marker, at + 1) >= 0 ||
+    result.xml.slice(0, at) + result.xml.slice(at + marker.length) !==
+      preSeal.xml
+  )
+    throw new Cfdi40Error([
+      cfdi40Issue("XML_ROUND_TRIP_MISMATCH", "Comprobante/@Sello", "ORBIT"),
+    ]);
+  return result;
 }

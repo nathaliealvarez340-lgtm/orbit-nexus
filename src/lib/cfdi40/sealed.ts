@@ -1,18 +1,28 @@
 import { X509Certificate, createHash } from "node:crypto";
 import { XMLParser } from "fast-xml-parser";
 import { certificateNumberFromSerial } from "@/lib/csd/certificate-number";
-import { Cfdi40Error, cfdi40Issue } from "./errors";
-import type { Cfdi40CertificateBinding, SealedCfdi40Xml } from "./types";
+import { verifyCfdiSeal } from "@/lib/csd/signing";
+import { Cfdi40Error, cfdi40Issue, type Cfdi40IssueCode } from "./errors";
+import {
+  isCfdi40OriginalString,
+  type Cfdi40CompiledXslt,
+} from "./original-string";
+import { isPreSealCfdi40, serializeSealedCfdi40 } from "./serialize";
+import type {
+  Cfdi40CertificateBinding,
+  Cfdi40OriginalString,
+  PreSealCfdi40Xml,
+  SealedCfdi40Xml,
+} from "./types";
 
-// Fase 5C.4: the only door from "CFDI" to "XSD validation" or "PAC". Two independent locks:
+// Fase 5C.4/5C.6: the only door from "CFDI" to "XSD validation" or "PAC". Two locks:
 // 1. Compile time: SealedCfdi40Xml carries a type-only brand that no value can have, so an
-//    UnsignedCfdi40Xml or an object literal is not assignable to it without a cast.
-// 2. Runtime: a value counts as sealed only if the sealing service registered it in this
-//    module (WeakSet, not exported) AND its Sello, Certificado and NoCertificado are
-//    structurally real. The sealing service does not exist in this phase, so nothing is
-//    registered and every value is rejected, including well-formed forgeries.
-// Verifying the Sello cryptographically needs the cadena original (official XSLT) and
-// belongs to the sealing gate (FASE5C §16.4); it is not claimed here.
+//    UnsignedCfdi40Xml, a PreSealCfdi40Xml or an object literal is not assignable to it.
+// 2. Runtime: a value counts as sealed only if createSealedCfdi40 registered it in this
+//    module (WeakSet, not exported) AND it is still consistent. createSealedCfdi40 registers
+//    nothing unless the Sello verifies cryptographically (FASE5C §16.4): over the cadena
+//    that was signed, and over the cadena recomputed with the official XSLT from the final
+//    XML, with the certificate written in it. Well-formed forgeries are rejected.
 
 const registry = new WeakSet<object>();
 
@@ -120,7 +130,137 @@ export function sealAttributeProblems(
 const sha256 = (bytes: Uint8Array) =>
   createHash("sha256").update(bytes).digest("hex");
 
-/** True only for a CFDI registered by ORBIT's sealing service and still consistent. */
+export type SealedXmlProblem =
+  | SealAttributeProblem
+  /** The official XSLT could not produce a cadena original from the XML. */
+  | "CADENA_ORIGINAL_UNAVAILABLE"
+  /** The Sello is not an RSA-SHA256 PKCS#1 v1.5 signature of that cadena by Certificado. */
+  | "SELLO_NOT_VERIFIED";
+
+const cadenaShape = /^\|\|[^\r\n]*\|\|$/;
+
+function inspectSealedXml(
+  xml: string,
+  stylesheet: Cfdi40CompiledXslt,
+  binding?: Cfdi40CertificateBinding,
+): { problems: SealedXmlProblem[]; cadena: string | null } {
+  const problems: SealedXmlProblem[] = sealAttributeProblems(xml, binding);
+  let cadena: string | null = null;
+  try {
+    const value = stylesheet.transformToText(xml);
+    cadena =
+      typeof value === "string" && cadenaShape.test(value) ? value : null;
+  } catch {
+    cadena = null;
+  }
+  if (cadena === null)
+    return { problems: [...problems, "CADENA_ORIGINAL_UNAVAILABLE"], cadena };
+  let attrs: Record<string, unknown> = {};
+  try {
+    const root = (parser.parse(xml) as Record<string, unknown>)[
+      "cfdi:Comprobante"
+    ];
+    if (root && typeof root === "object")
+      attrs = root as Record<string, unknown>;
+  } catch {
+    // Already reported by sealAttributeProblems.
+  }
+  const seal = decode(typeof attrs.Sello === "string" ? attrs.Sello : "");
+  const der = decode(
+    typeof attrs.Certificado === "string" ? attrs.Certificado : "",
+  );
+  let verified = false;
+  try {
+    verified =
+      !!seal &&
+      !!der &&
+      verifyCfdiSeal(
+        new X509Certificate(der).publicKey,
+        Buffer.from(cadena, "utf8"),
+        seal,
+      );
+  } catch {
+    verified = false;
+  }
+  if (!verified) problems.push("SELLO_NOT_VERIFIED");
+  return { problems, cadena };
+}
+
+/**
+ * FASE5C §16.4 for any sealed XML, as a PAC would check it: structural seal attributes, the
+ * cadena original recomputed from the XML itself with the official XSLT, and the Sello
+ * verified over that cadena with the Certificado written in the XML. An empty list means
+ * the XML has not changed since it was sealed. It does not register anything.
+ */
+export function sealedCfdi40XmlProblems(
+  xml: string,
+  stylesheet: Cfdi40CompiledXslt,
+  binding?: Cfdi40CertificateBinding,
+): SealedXmlProblem[] {
+  return inspectSealedXml(xml, stylesheet, binding).problems;
+}
+
+const sealFailure = (code: Cfdi40IssueCode, path = "Comprobante/@Sello") =>
+  new Cfdi40Error([cfdi40Issue(code, path, "ORBIT")]);
+
+/**
+ * Fase 5C.6: the ONLY constructor of SealedCfdi40Xml. Built exclusively from the pre-seal
+ * XML and a Sello: the Sello must verify over the cadena it was computed from (generated by
+ * ORBIT from this very pre-seal XML); the XML is that pre-seal tree with Sello added and
+ * nothing recomputed; and the final XML must verify on its own (cadena recomputed with the
+ * official XSLT equal to the signed one, Sello valid with its Certificado). Any failure
+ * throws CFDI_SEAL_VERIFICATION_FAILED and nothing is registered.
+ */
+export function createSealedCfdi40(
+  preSeal: PreSealCfdi40Xml,
+  originalString: Cfdi40OriginalString,
+  sello: string,
+  stylesheet: Cfdi40CompiledXslt,
+): SealedCfdi40Xml {
+  if (!isPreSealCfdi40(preSeal))
+    throw sealFailure("PRE_SEAL_CFDI_REQUIRED", "Comprobante");
+  if (
+    !isCfdi40OriginalString(originalString) ||
+    originalString.preSealSha256 !== preSeal.sha256 ||
+    originalString.noCertificado !== preSeal.certificate.noCertificado
+  )
+    throw sealFailure("ORIGINAL_STRING_INVALID", "CadenaOriginal");
+  const der = decode(preSeal.certificate.certificadoBase64);
+  const seal = decode(sello);
+  let verified = false;
+  try {
+    verified =
+      !!der &&
+      !!seal &&
+      verifyCfdiSeal(
+        new X509Certificate(der).publicKey,
+        originalString.bytes,
+        seal,
+      );
+  } catch {
+    verified = false;
+  }
+  if (!verified) throw sealFailure("CFDI_SEAL_VERIFICATION_FAILED");
+  const written = serializeSealedCfdi40(preSeal, sello);
+  const { problems, cadena } = inspectSealedXml(
+    written.xml,
+    stylesheet,
+    preSeal.certificate,
+  );
+  if (problems.length || cadena !== originalString.value)
+    throw sealFailure("CFDI_SEAL_VERIFICATION_FAILED");
+  const value = Object.freeze({
+    stage: "SEALED",
+    ...written,
+    certificate: preSeal.certificate,
+    preSealSha256: preSeal.sha256,
+    originalStringSha256: originalString.sha256,
+  }) as unknown as SealedCfdi40Xml;
+  registry.add(value);
+  return value;
+}
+
+/** True only for a CFDI registered by createSealedCfdi40 and unchanged since. */
 export function isSealedCfdi40(value: unknown): value is SealedCfdi40Xml {
   if (!value || typeof value !== "object" || !registry.has(value)) return false;
   const candidate = value as Partial<{

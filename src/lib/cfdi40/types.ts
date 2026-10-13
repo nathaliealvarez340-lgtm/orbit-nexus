@@ -6,7 +6,8 @@
 //     → validator  → issues             (catalogs, combinations, limits, facets)
 //     → serializer → UnsignedCfdi40Xml  (deterministic bytes, no NoCertificado/Certificado/Sello)
 //     → pre-seal   → PreSealCfdi40Xml   (+ NoCertificado, Certificado of the VALID CSD; Fase 5C.5)
-//     → official SAT XSLT → Cfdi40OriginalString (exact output; signing is the next gate)
+//     → official SAT XSLT → Cfdi40OriginalString (exact output)
+//     → CSD signature, verified → SealedCfdi40Xml (+ Sello; Fase 5C.6) → future XSD → PAC
 //
 // Monetary values are decimal strings everywhere; they are parsed only by ./decimal.ts.
 
@@ -200,8 +201,8 @@ export type Cfdi40Document = {
 // so an XML without them can never be XSD-valid, and no placeholder is ever written.
 
 /**
- * Fiscal content only: no NoCertificado, Certificado or Sello. Input of the future sealing
- * step; never sendable to a PAC (only SealedCfdi40Xml may be, after XSD validation).
+ * Fiscal content only: no NoCertificado, Certificado or Sello. Never sendable to a PAC (only
+ * SealedCfdi40Xml may be, after XSD validation).
  */
 export type UnsignedCfdi40Xml = {
   readonly stage: "UNSIGNED";
@@ -210,7 +211,7 @@ export type UnsignedCfdi40Xml = {
   readonly sha256: string;
 };
 /**
- * Future (sealing block): NoCertificado and Certificado taken server-side from the active
+ * NoCertificado and Certificado, taken server-side from the public certificate of the active
  * VALID CSD. The cadena original is generated from the XML with these attributes and
  * without Sello.
  */
@@ -237,7 +238,7 @@ export type PreSealCfdi40Xml = {
 declare const originalStringBrand: unique symbol;
 /**
  * Fase 5C.5: the output of the official SAT XSLT, exactly as produced (no trim, no
- * normalization). `bytes` (UTF-8) is what the future sealing step signs.
+ * normalization). `bytes` (UTF-8) is what the CSD signs (Fase 5C.6).
  */
 export type Cfdi40OriginalString = {
   readonly [originalStringBrand]: true;
@@ -254,9 +255,10 @@ export type Cfdi40OriginalString = {
 /** Type-only brand: no value exists, so no object literal can satisfy SealedCfdi40Xml. */
 declare const sealedBrand: unique symbol;
 /**
- * Future (sealing block), produced only after the seal is verified locally. No function in
- * this phase returns it. Besides this compile-time brand, ./sealed.ts accepts at runtime
- * only objects registered by the sealing service, whatever their shape.
+ * Fase 5C.6: the pre-seal XML plus a Sello verified locally (FASE5C §16.4). Produced only by
+ * createSealedCfdi40 (./sealed.ts), which registers it; besides this compile-time brand,
+ * ./sealed.ts accepts at runtime only registered, unchanged values, whatever their shape.
+ * The only representation an XSD validator or a PAC adapter may receive.
  */
 export type SealedCfdi40Xml = {
   readonly [sealedBrand]: true;
@@ -265,4 +267,8 @@ export type SealedCfdi40Xml = {
   readonly bytes: Uint8Array;
   readonly sha256: string;
   readonly certificate: Cfdi40CertificateBinding;
+  /** SHA-256 of the pre-seal XML it was sealed from. */
+  readonly preSealSha256: string;
+  /** SHA-256 of the UTF-8 cadena original that the Sello signs. */
+  readonly originalStringSha256: string;
 };

@@ -6,6 +6,7 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { PacEnvironment } from "@/types/stamping";
+import { decipherAll } from "./decipher";
 import {
   KeyProviderError,
   type CsdKeyProvider,
@@ -113,10 +114,7 @@ export async function openPrivateKey(
     decipher.setAAD(dataAad(context));
     decipher.setAuthTag(sealed.authTag);
     try {
-      return Buffer.concat([
-        decipher.update(sealed.ciphertext),
-        decipher.final(),
-      ]);
+      return decipherAll(decipher, sealed.ciphertext);
     } catch {
       throw new EnvelopeError("INTEGRITY");
     }

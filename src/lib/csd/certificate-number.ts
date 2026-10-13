@@ -4,7 +4,8 @@
 /**
  * §M.8 — UNVERIFIED HYPOTHESIS pending official SAT sources and official test CSD: the
  * certificate serial number is 20 bytes, each an ASCII digit, and those digits are the
- * 20-digit NoCertificado. Any other serial is unsupported (step 8).
+ * 20-digit NoCertificado. Any other serial is unsupported (step 8). Not verified by the SAT:
+ * production waits for gate OFFICIAL_CSD_FIXTURE_VALIDATED (./production-gates.ts).
  */
 export function certificateNumberFromSerial(serialNumberHex: string) {
   const hex =

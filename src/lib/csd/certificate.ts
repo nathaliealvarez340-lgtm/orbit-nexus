@@ -9,8 +9,13 @@ import { CsdError } from "./errors";
 import { certificateNumberFromSerial } from "./certificate-number";
 
 // Fase 5C.3 §M steps 5–8 for the public certificate (.cer). Only what node:crypto and the
-// DER structure can demonstrate is checked. csdTypeVerifiedLocally stays false: no
-// officially documented property distinguishing a CSD from an e.firma has been verified.
+// DER structure can demonstrate is checked. csdTypeVerifiedLocally stays false: ORBIT has no
+// OFFLINE rule reliable enough, with these local X.509 checks alone, to tell a CSD from an
+// e.firma. That does not mean the SAT cannot: it classifies certificates (FIEL / SELLOS) and
+// stamping through a PAC requires a CSD. Before production stamping a verifiable mechanism
+// (SAT source, authorized PAC, or another official or contractually reliable one) must
+// confirm the type: gate CSD_TYPE_VERIFIED (./production-gates.ts). No subject, issuer or OID
+// heuristic is used without official evidence.
 
 export type CertificateInfo = {
   der: Buffer;
@@ -83,7 +88,8 @@ export function assertWithinValidity(info: CertificateInfo, now: Date) {
  * §M.7 — UNVERIFIED HYPOTHESIS pending official SAT sources and official test CSD: the
  * taxpayer RFC is the first "/"-separated token of the single subject attribute
  * x500UniqueIdentifier (OID 2.5.4.45), encoded as a string (persona moral:
- * "<RFC moral> / <RFC representante>"). Anything else is unverifiable: never guessed.
+ * "<RFC moral> / <RFC representante>"). Anything else is unverifiable: never guessed. Not
+ * verified by the SAT: production waits for gate OFFICIAL_CSD_FIXTURE_VALIDATED.
  */
 export const rfcAttributeOid = "2.5.4.45";
 const rfcPattern = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
