@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFile } from "node:fs/promises";
 import { Cfdi40Error } from "../src/lib/cfdi40/errors";
-import { pacSubmission } from "../src/lib/cfdi40/sealed";
+import { pacSubmission } from "../src/lib/cfdi40/schema";
 import { verifyActiveCsdEnvelope } from "../src/services/csd-store";
 
 // Product rule: a CSD is needed only to seal and stamp. Clients, client CSF and invoice
@@ -37,7 +37,7 @@ test("clients, client CSF and invoice drafts never depend on a CSD", async () =>
     );
 });
 
-test("sealing and stamping still require an active CSD and a sealed CFDI", async () => {
+test("sealing and stamping still require an active CSD and a sealed, XSD-validated CFDI", async () => {
   const noActiveCsd = { csdCertificate: { findFirst: async () => null } };
   assert.equal(
     await verifyActiveCsdEnvelope(noActiveCsd as never, "org-a", {}),
@@ -47,6 +47,6 @@ test("sealing and stamping still require an active CSD and a sealed CFDI", async
     () => pacSubmission({ stage: "UNSIGNED", xml: "<cfdi:Comprobante/>" }),
     (error: unknown) =>
       error instanceof Cfdi40Error &&
-      error.issues[0].code === "SEALED_CFDI_REQUIRED",
+      error.issues[0].code === "XSD_VALIDATED_CFDI_REQUIRED",
   );
 });

@@ -27,9 +27,9 @@ import {
 } from "../src/lib/cfdi40/original-string";
 import {
   isSealedCfdi40,
-  pacSubmission,
   sealAttributeProblems,
 } from "../src/lib/cfdi40/sealed";
+import { pacSubmission } from "../src/lib/cfdi40/schema";
 import {
   isPreSealCfdi40,
   serializePreSealCfdi40,
@@ -418,7 +418,7 @@ test("pre-seal XML: the CSD certificate in cfdv40.xsd order, no Sello, determini
     assert.equal(isSealedCfdi40(xml), false);
     assert.equal(
       codeOf(() => pacSubmission(xml)),
-      "SEALED_CFDI_REQUIRED",
+      "XSD_VALIDATED_CFDI_REQUIRED",
     );
   }
 });

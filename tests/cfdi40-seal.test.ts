@@ -26,14 +26,17 @@ import {
   generateCfdi40OriginalString,
   type Cfdi40CompiledXslt,
 } from "../src/lib/cfdi40/original-string";
-import { cfdi40SchemaValidator } from "../src/lib/cfdi40/schema";
+import {
+  isXsdValidatedCfdi40,
+  pacSubmission,
+  type Cfdi40PacSubmission,
+} from "../src/lib/cfdi40/schema";
 import {
   createSealedCfdi40,
   isSealedCfdi40,
-  pacSubmission,
   sealedCfdi40XmlProblems,
-  type Cfdi40PacSubmission,
 } from "../src/lib/cfdi40/sealed";
+import { validateOfficialSealedCfdi40Xsd } from "../src/lib/cfdi40/xsd-engine";
 import { serializeSealedCfdi40 } from "../src/lib/cfdi40/serialize";
 import { cfdi40XsltEngine } from "../src/lib/cfdi40/xslt-engine";
 import {
@@ -271,12 +274,15 @@ test("ten ORBIT invoices sealed: Sello in its cfdv40.xsd position, nothing recom
     );
     // Deterministic: the same pre-seal XML and key give the same sealed bytes.
     assert.equal(seal(name).sealed.xml, sealed.xml, name);
-    // Only now can it reach the PAC contract and the XSD gate (no engine yet: UNAVAILABLE).
-    assert.equal(pacSubmission(sealed).cfdi, sealed);
-    assert.deepEqual(await cfdi40SchemaValidator.validate(sealed), {
-      status: "UNAVAILABLE",
-      reason: "NO_APPROVED_XSD_ENGINE",
-    });
+    // Sealed is not enough for a PAC (Fase 5C.7): it must pass the official XSD first.
+    assert.equal(
+      codeOf(() => pacSubmission(sealed)),
+      "XSD_VALIDATED_CFDI_REQUIRED",
+    );
+    const validated = await validateOfficialSealedCfdi40Xsd(sealed);
+    assert(isXsdValidatedCfdi40(validated));
+    assert.equal(validated.sha256, sealed.sha256);
+    assert.equal(pacSubmission(validated).cfdi, validated);
   }
 });
 
@@ -425,7 +431,7 @@ test("after sealing, changing any fiscal byte, the certificate or the Sello fail
   assert.equal(isSealedCfdi40(registered), false);
   assert.equal(
     codeOf(() => pacSubmission(registered)),
-    "SEALED_CFDI_REQUIRED",
+    "XSD_VALIDATED_CFDI_REQUIRED",
   );
 });
 
@@ -487,7 +493,11 @@ test("a sealed CFDI is built only from ORBIT's pre-seal XML, its own cadena and 
   );
   assert(isSealedCfdi40(createSealedCfdi40(xml, cadena, sello, stylesheet)));
 
-  // Types: only SealedCfdi40Xml reaches a PAC; no literal can be one.
+  // Types: only XsdValidatedCfdi40 reaches a PAC (Fase 5C.7); no literal can be sealed.
+  const sealedValue = createSealedCfdi40(xml, cadena, sello, stylesheet);
+  // @ts-expect-error A sealed CFDI that did not pass the XSD cannot be submitted to a PAC.
+  const fromSealed: Cfdi40PacSubmission = { cfdi: sealedValue };
+  assert.equal(isXsdValidatedCfdi40(fromSealed.cfdi), false);
   const unsigned = { stage: "UNSIGNED" } as UnsignedCfdi40Xml;
   // @ts-expect-error An unsigned XML cannot be submitted to a PAC.
   const fromUnsigned: Cfdi40PacSubmission = { cfdi: unsigned };

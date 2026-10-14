@@ -49,7 +49,11 @@ import {
   readCfdi40Resource,
   verifyCfdi40Resources,
 } from "../src/lib/cfdi40/resources";
-import { cfdi40SchemaValidator } from "../src/lib/cfdi40/schema";
+import {
+  unavailableXsdEngine,
+  validateSealedCfdi40Xsd,
+} from "../src/lib/cfdi40/schema";
+import { loadCfdi40XsdBundle } from "../src/lib/cfdi40/xsd-resources";
 import {
   cfdi40Namespace,
   cfdi40SchemaLocation,
@@ -988,10 +992,17 @@ test("the unsigned representation is not a sealed CFDI and no XSD validation is 
     certificate: { noCertificado: "", certificadoBase64: "" },
   } as SealedCfdi40Xml;
   // A cast defeats the compile-time brand, not the runtime gate.
-  assert.deepEqual(await cfdi40SchemaValidator.validate(placeholder), {
-    status: "REJECTED",
-    reason: "NOT_SEALED_BY_ORBIT",
-  });
+  const bundle = await loadCfdi40XsdBundle();
+  assert.throws(
+    () =>
+      validateSealedCfdi40Xsd(placeholder, {
+        engine: unavailableXsdEngine,
+        bundle,
+      }),
+    (error: unknown) =>
+      error instanceof Cfdi40Error &&
+      error.issues[0].code === "SEALED_CFDI_REQUIRED",
+  );
 });
 
 test("adapter and mapper: Prisma record → ORBIT snapshot → CFDI vocabulary, without inventing data", () => {

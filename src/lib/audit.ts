@@ -101,6 +101,18 @@ export const auditCatalog = {
     metadata: ["errorCode", "certificateId", "environment"],
     identifiers: ["certificateId"],
   },
+  // Fase 5C.7: official XSD validation of a sealed CFDI. A short hash of the XSD set and a
+  // result code only: never the XML, Sello, certificate, RFC, cadena or amounts.
+  "cfdi.xsd.validated": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: ["xsdBundle"],
+  },
+  "cfdi.xsd.failed": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: ["errorCode", "xsdBundle"],
+  },
   "invoice.stamp_authorized": {
     scope: "TENANT",
     targetType: "StampedInvoice",

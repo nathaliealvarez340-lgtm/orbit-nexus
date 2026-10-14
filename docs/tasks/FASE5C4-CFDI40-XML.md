@@ -203,7 +203,7 @@ filas heredadas de Fase 3. La política que impide que se conviertan en CFDI est
 | `decimal.ts` | Aritmética exacta y fórmulas de límites |
 | `resources.ts` | Lectura de recursos SAT verificada por hash y confinada a `resources/sat/cfdi40` |
 | `sealed.ts` | Única puerta hacia XSD o PAC: registro privado del servicio de sello + comprobación estructural de `Sello`, `Certificado`, `NoCertificado` (§17) |
-| `schema.ts` | Gate XSD (solo acepta `SealedCfdi40Xml`; rechaza lo no sellado por ORBIT; hoy `UNAVAILABLE`) |
+| `schema.ts` | Gate XSD (solo acepta `SealedCfdi40Xml`; rechaza lo no sellado por ORBIT). Fase 5C.7: validación XSD oficial real, ver `FASE5C7-XSD-VALIDATION.md` |
 | `build.ts` | Orquestador puro `buildUnsignedCfdi40(invoice, { issuedAt, catalogs })` y gate de READY `checkCfdi40Content(invoice, { at, catalogs })` (§14) |
 | `readiness.ts` | Traduce los issues CFDI al contrato de validación de Invoice Studio (`CFDI_<código>`) |
 | `errors.ts` | Códigos estables y categorías |
@@ -297,12 +297,13 @@ el orden de serialización.
   presenta como «validado contra XSD».
 - El XML sin sellar no puede ser válido contra el XSD; el gate (`schema.ts`) solo acepta
   `SealedCfdi40Xml`, responde `REJECTED / NOT_SEALED_BY_ORBIT` a todo lo no sellado por
-  ORBIT y, para un CFDI sellado, `UNAVAILABLE / NO_APPROVED_XSD_ENGINE`.
+  ORBIT y, para un CFDI sellado, `UNAVAILABLE / NO_APPROVED_XSD_ENGINE`. **Actualizado en Fase 5C.7:**
+  el gate valida contra el XSD oficial y devuelve `XsdValidatedCfdi40` (`FASE5C7-XSD-VALIDATION.md`).
 - Auditoría de motores (nada instalado):
 
 | Candidato | Resultado |
 |---|---|
-| `xmllint-wasm` 5.3.0 | Auditoría técnica completa en §20: **NEEDS POC** |
+| `xmllint-wasm` 5.3.0 | Auditoría técnica completa en §20: **NEEDS POC**. Fase 5C.7: descartado tras POC; elegido `libxml2-wasm` 0.7.2 (`FASE5C7-XSD-VALIDATION.md` §5) |
 | `libxmljs2` 0.37.0 / `libxmljs` 1.0.11 | Bindings nativos (node-gyp/prebuild): descartados como en §AA.5.1 |
 | `xsd-schema-validator` 0.11.0 | Ejecuta Java en un proceso hijo: descartado |
 | `@cfdi/xsd` 4.0.19 | `ajv` (`new Function`), conversión a JSON Schema: no es validación XSD; descartado |

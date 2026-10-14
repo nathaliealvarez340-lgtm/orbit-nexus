@@ -22,15 +22,19 @@ import {
   cfdi40ResourcePath,
   readCfdi40Resource,
 } from "../src/lib/cfdi40/resources";
-import { cfdi40SchemaValidator } from "../src/lib/cfdi40/schema";
+import {
+  pacSubmission,
+  unavailableXsdEngine,
+  validateSealedCfdi40Xsd,
+  type Cfdi40PacAdapter,
+} from "../src/lib/cfdi40/schema";
 import {
   assertSealedCfdi40,
   isSealedCfdi40,
-  pacSubmission,
   sealAttributeProblems,
-  type Cfdi40PacAdapter,
   type SealAttributeProblem,
 } from "../src/lib/cfdi40/sealed";
+import { loadCfdi40XsdBundle } from "../src/lib/cfdi40/xsd-resources";
 import type {
   OrbitInvoiceForCfdi,
   SealedCfdi40Xml,
@@ -256,13 +260,23 @@ test("only a CFDI sealed and registered by ORBIT can reach the XSD gate or a PAC
     certificate: { noCertificado: "", certificadoBase64: "" },
   };
   const adapter: Cfdi40PacAdapter = { submit: async () => undefined };
-  // @ts-expect-error A PAC adapter accepts only a sealed submission.
+  // @ts-expect-error A PAC adapter accepts only a sealed, XSD-validated submission.
   await adapter.submit({ cfdi: unsigned });
-  const gate = await cfdi40SchemaValidator.validate(
-    // @ts-expect-error The XSD gate accepts only a sealed CFDI.
-    unsigned,
+  const xsd = {
+    engine: unavailableXsdEngine,
+    bundle: await loadCfdi40XsdBundle(),
+  };
+  assert.throws(
+    () =>
+      validateSealedCfdi40Xsd(
+        // @ts-expect-error The XSD gate accepts only a sealed CFDI.
+        unsigned,
+        xsd,
+      ),
+    (error: unknown) =>
+      error instanceof Cfdi40Error &&
+      error.issues[0].code === "SEALED_CFDI_REQUIRED",
   );
-  assert.equal(gate.status, "REJECTED");
   assert.equal(isSealedCfdi40(asSealed), false);
   assert.equal(isSealedCfdi40(literal), false);
 
@@ -359,12 +373,14 @@ test("only a CFDI sealed and registered by ORBIT can reach the XSD gate or a PAC
     error.issues[0].category === "SEAL";
   assert.equal(isSealedCfdi40(forged), false);
   assert.throws(() => assertSealedCfdi40(forged), notSealed);
-  assert.throws(() => pacSubmission(forged), notSealed);
-  assert.throws(() => pacSubmission(unsigned), notSealed);
-  assert.deepEqual(await cfdi40SchemaValidator.validate(forged), {
-    status: "REJECTED",
-    reason: "NOT_SEALED_BY_ORBIT",
-  });
+  // Fase 5C.7: the PAC needs an XSD-validated CFDI; the XSD gate refuses what ORBIT did not
+  // seal, before any schema is compiled.
+  const notXsdValidated = (error: unknown) =>
+    error instanceof Cfdi40Error &&
+    error.issues[0].code === "XSD_VALIDATED_CFDI_REQUIRED";
+  assert.throws(() => pacSubmission(forged), notXsdValidated);
+  assert.throws(() => pacSubmission(unsigned), notXsdValidated);
+  assert.throws(() => validateSealedCfdi40Xsd(forged, xsd), notSealed);
 
   // Fase 5C.6: exactly one place registers a sealed CFDI, createSealedCfdi40, and only after
   // the Sello verification that throws CFDI_SEAL_VERIFICATION_FAILED.

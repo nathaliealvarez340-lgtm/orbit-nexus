@@ -381,7 +381,8 @@ coincidieron byte a byte en todos los casos.
 
 ## 12. XSD
 
-Separado: el estado sigue siendo **NO XSD VALIDATED** (`xmllint-wasm`: NEEDS POC, sin instalar).
+Separado: en esta fase el estado era **NO XSD VALIDATED** (`xmllint-wasm`: NEEDS POC, sin instalar).
+Fase 5C.7 implementa la validación XSD oficial: `FASE5C7-XSD-VALIDATION.md`.
 El XML pre-sello tampoco es válido contra `cfdv40.xsd` (falta `Sello`). Orden futuro: pre-sello →
 cadena → sello → XML sellado → XSD → PAC.
 

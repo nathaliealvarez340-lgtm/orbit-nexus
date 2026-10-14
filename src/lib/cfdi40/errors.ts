@@ -417,10 +417,36 @@ const issues = {
     "El sello no se verificó con el certificado sobre la cadena original del XML; el comprobante no se considera sellado.",
   ],
 
-  // XSD.
-  XSD_VALIDATOR_UNAVAILABLE: [
+  // XSD oficial (Fase 5C.7). Messages never carry the XML, values, paths of the server or
+  // texts of the validator; the specific rule goes in `rule` ("XSD:<kind>").
+  CFDI_XSD_INVALID: [
     "XSD",
-    "No hay un motor de validación XSD aprobado; el XML no está validado contra el XSD.",
+    "El XML sellado no cumple el esquema oficial cfdv40.xsd del SAT (estructura, orden, tipos, atributos o facetas).",
+  ],
+  CFDI_XSD_UNSUPPORTED_NAMESPACE: [
+    "XSD",
+    "El XML contiene un espacio de nombres, complemento o addenda fuera del alcance soportado por ORBIT.",
+  ],
+  CFDI_XSD_MALFORMED_XML: ["XSD", "El XML no está bien formado."],
+  CFDI_XSD_FORBIDDEN_MARKUP: [
+    "XSD",
+    "El XML contiene DOCTYPE, DTD, entidades, CDATA, comentarios o instrucciones de procesamiento; ORBIT no los acepta.",
+  ],
+  CFDI_XSD_SCHEMA_UNAVAILABLE: [
+    "XSD",
+    "El esquema oficial o el motor de validación XSD no están disponibles; el CFDI no se valida ni se envía al PAC.",
+  ],
+  CFDI_XSD_SCHEMA_INTEGRITY_FAILED: [
+    "XSD",
+    "El conjunto de esquemas oficiales no coincide con su manifiesto o pidió un recurso no permitido; el CFDI no se valida.",
+  ],
+  CFDI_XSD_VALIDATION_FAILED: [
+    "XSD",
+    "La validación XSD falló por un error interno; el CFDI no se considera validado.",
+  ],
+  XSD_VALIDATED_CFDI_REQUIRED: [
+    "XSD",
+    "Solo un CFDI sellado por ORBIT y validado contra el XSD oficial puede enviarse al PAC.",
   ],
 } as const satisfies Record<string, readonly [Cfdi40IssueCategory, string]>;
 
@@ -433,18 +459,23 @@ export type Cfdi40Issue = {
   /** CFDI40xxx, XSD:<attribute>, ANEXO20 or ORBIT. */
   rule: string;
   message: string;
+  /** Position in the XML, when the issue comes from parsing or XSD validation (Fase 5C.7). */
+  line?: number;
+  column?: number;
 };
 
 export const cfdi40Issue = (
   code: Cfdi40IssueCode,
   path: string,
   rule: string,
+  position?: { line: number; column: number },
 ): Cfdi40Issue => ({
   code,
   category: issues[code][0],
   path,
   rule,
   message: issues[code][1],
+  ...(position ? { line: position.line, column: position.column } : {}),
 });
 
 export const cfdi40IssueCodes = Object.keys(issues) as Cfdi40IssueCode[];

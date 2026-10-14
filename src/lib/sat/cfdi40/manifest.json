@@ -20,7 +20,9 @@
       "imports": [
         "http://www.sat.gob.mx/sitio_internet/cfd/catalogos/catCFDI.xsd",
         "http://www.sat.gob.mx/sitio_internet/cfd/tipoDatos/tdCFDI/tdCFDI.xsd"
-      ]
+      ],
+      "referencedBy": [],
+      "namespace": "http://www.sat.gob.mx/cfd/4"
     },
     {
       "name": "tdCFDI.xsd",
@@ -35,7 +37,11 @@
       "bytes": 7315,
       "sha256": "b3b81fe4017b95d5477f23a32f47e8b0571683cfddfff1330508c75e02b504cd",
       "stored": "resources/sat/cfdi40/tdCFDI.xsd",
-      "imports": []
+      "imports": [],
+      "referencedBy": [
+        "http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd"
+      ],
+      "namespace": "http://www.sat.gob.mx/sitio_internet/cfd/tipoDatos/tdCFDI"
     },
     {
       "name": "catCFDI.xsd",
@@ -50,7 +56,11 @@
       "bytes": 5984046,
       "sha256": "6c58936cb77576f839a4d7915953ceaf252b9eb9319f9458fe5bb67ae2bb0bb1",
       "stored": "resources/sat/cfdi40/catCFDI.xsd",
-      "imports": []
+      "imports": [],
+      "referencedBy": [
+        "http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd"
+      ],
+      "namespace": "http://www.sat.gob.mx/sitio_internet/cfd/catalogos"
     },
     {
       "name": "cadenaoriginal_4_0.xslt",

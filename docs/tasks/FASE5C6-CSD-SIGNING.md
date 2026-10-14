@@ -291,7 +291,8 @@ llamarlo solo después de validarla y con el `invoiceId` resuelto en el servidor
 
 **XSD:** `cfdi40SchemaValidator.validate(SealedCfdi40Xml)` ya existe como gate y hoy responde
 `UNAVAILABLE / NO_APPROVED_XSD_ENGINE` para un CFDI sellado (y `REJECTED` para todo lo demás). La
-siguiente fase elige y audita el motor XSD (sin dependencias nuevas en esta). Si el XSD falla, el
+siguiente fase elige y audita el motor XSD (sin dependencias nuevas en esta; hecho en Fase 5C.7,
+`FASE5C7-XSD-VALIDATION.md`, y el PAC recibe ahora solo `XsdValidatedCfdi40`). Si el XSD falla, el
 XML sellado se descarta y no se envía al PAC.
 
 ## 14. Riesgos y límites
@@ -347,7 +348,7 @@ fallaron hasta regenerar ese artefacto (sin cambios en código ni pruebas).
 | Tamper resistance | PASS |
 | No-network signing | PASS |
 | Private-key lifecycle | PASS |
-| XSD oficial | PENDING |
+| XSD oficial | PENDING (PASS en Fase 5C.7: `FASE5C7-XSD-VALIDATION.md`) |
 | CSD type official verification (`CSD_TYPE_VERIFIED`) | PENDING |
 | Official CSD fixture (`OFFICIAL_CSD_FIXTURE_VALIDATED`) | PENDING |
 | Postgres concurrency (`POSTGRES_CSD_CONCURRENCY_VALIDATED`) | PENDING |

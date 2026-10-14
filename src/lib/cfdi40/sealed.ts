@@ -15,7 +15,7 @@ import type {
   SealedCfdi40Xml,
 } from "./types";
 
-// Fase 5C.4/5C.6: the only door from "CFDI" to "XSD validation" or "PAC". Two locks:
+// Fase 5C.4/5C.6: the only door from "CFDI" to XSD validation (and, through it, to a PAC). Two locks:
 // 1. Compile time: SealedCfdi40Xml carries a type-only brand that no value can have, so an
 //    UnsignedCfdi40Xml, a PreSealCfdi40Xml or an object literal is not assignable to it.
 // 2. Runtime: a value counts as sealed only if createSealedCfdi40 registered it in this
@@ -289,14 +289,5 @@ export function assertSealedCfdi40(
     ]);
 }
 
-/** The only input a PAC adapter may receive (FASE5C3 §AA.0): a sealed, verified CFDI. */
-export type Cfdi40PacSubmission = { readonly cfdi: SealedCfdi40Xml };
-/** Contract for future PAC adapters: they cannot be called with anything else. */
-export interface Cfdi40PacAdapter {
-  submit(input: Cfdi40PacSubmission): Promise<unknown>;
-}
-
-export function pacSubmission(value: unknown): Cfdi40PacSubmission {
-  assertSealedCfdi40(value);
-  return { cfdi: value };
-}
+// Fase 5C.7: a sealed CFDI is not enough for a PAC. The PAC contract (pacSubmission,
+// Cfdi40PacAdapter) lives in ./schema.ts and accepts only XsdValidatedCfdi40.

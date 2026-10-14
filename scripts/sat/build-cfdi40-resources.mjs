@@ -1,4 +1,6 @@
-// Versions the official CFDI 4.0 technical resources (Fase 5C.4, 5C.5).
+// Versions the official CFDI 4.0 technical resources (Fase 5C.4, 5C.5, 5C.7).
+// To obtain the files, use scripts/sat/fetch-cfdi40-resources.mjs (allowlisted SAT URLs into
+// an empty staging directory, with a diff against this manifest); review, then run this.
 //
 // Inputs (never fetched at request time):
 //   --dir          directory with the files downloaded from the official SAT URLs below,
@@ -23,6 +25,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import {
+  buildCfdi40XsdBundle,
+  writeCfdi40XsdBundle,
+} from "./cfdi40-xsd-bundle.mjs";
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((pairs, value, index, all) => {
@@ -230,20 +236,20 @@ const bundle = [root, ...includeEntries].map((entry) => {
 
 const output = path.resolve("src/lib/sat/cfdi40");
 mkdirSync(output, { recursive: true });
+const manifest = {
+  standard: "CFDI",
+  cfdiVersion: "4.0",
+  namespace: "http://www.sat.gob.mx/cfd/4",
+  schemaLocation: "http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd",
+  resources: [...entries, ...includeEntries],
+};
+// Fase 5C.7: XSD namespaces, import graph (closed) and the runtime XSD bundle.
+const xsdBundle = buildCfdi40XsdBundle(manifest);
 writeFileSync(
   path.join(output, "manifest.json"),
-  JSON.stringify(
-    {
-      standard: "CFDI",
-      cfdiVersion: "4.0",
-      namespace: "http://www.sat.gob.mx/cfd/4",
-      schemaLocation: "http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd",
-      resources: [...entries, ...includeEntries],
-    },
-    null,
-    2,
-  ) + "\n",
+  JSON.stringify(manifest, null, 2) + "\n",
 );
+writeCfdi40XsdBundle(xsdBundle, output);
 writeFileSync(
   path.join(output, "cadenaoriginal-xslt.json"),
   JSON.stringify({ root: root.url, resources: bundle }, null, 2) + "\n",

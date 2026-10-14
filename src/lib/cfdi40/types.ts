@@ -7,7 +7,8 @@
 //     → serializer → UnsignedCfdi40Xml  (deterministic bytes, no NoCertificado/Certificado/Sello)
 //     → pre-seal   → PreSealCfdi40Xml   (+ NoCertificado, Certificado of the VALID CSD; Fase 5C.5)
 //     → official SAT XSLT → Cfdi40OriginalString (exact output)
-//     → CSD signature, verified → SealedCfdi40Xml (+ Sello; Fase 5C.6) → future XSD → PAC
+//     → CSD signature, verified → SealedCfdi40Xml (+ Sello; Fase 5C.6)
+//     → official SAT XSD (exact bytes) → XsdValidatedCfdi40 (Fase 5C.7) → future PAC
 //
 // Monetary values are decimal strings everywhere; they are parsed only by ./decimal.ts.
 
@@ -258,7 +259,8 @@ declare const sealedBrand: unique symbol;
  * Fase 5C.6: the pre-seal XML plus a Sello verified locally (FASE5C §16.4). Produced only by
  * createSealedCfdi40 (./sealed.ts), which registers it; besides this compile-time brand,
  * ./sealed.ts accepts at runtime only registered, unchanged values, whatever their shape.
- * The only representation an XSD validator or a PAC adapter may receive.
+ * The only representation the XSD validator accepts (Fase 5C.7); a PAC adapter needs more:
+ * XsdValidatedCfdi40.
  */
 export type SealedCfdi40Xml = {
   readonly [sealedBrand]: true;
@@ -271,4 +273,29 @@ export type SealedCfdi40Xml = {
   readonly preSealSha256: string;
   /** SHA-256 of the UTF-8 cadena original that the Sello signs. */
   readonly originalStringSha256: string;
+};
+
+/** Type-only brand: no value exists, so no object literal can satisfy XsdValidatedCfdi40. */
+declare const xsdValidatedBrand: unique symbol;
+/**
+ * Fase 5C.7: "these exact sealed bytes were validated against this exact official XSD set".
+ * Produced only by validateSealedCfdi40Xsd (./schema.ts), which registers it; a value whose
+ * bytes change afterwards stops being valid. The only input a PAC adapter may receive.
+ */
+export type XsdValidatedCfdi40 = {
+  readonly [xsdValidatedBrand]: true;
+  readonly stage: "XSD_VALIDATED";
+  readonly xml: string;
+  readonly bytes: Uint8Array;
+  /** SHA-256 of the XML bytes, equal to the SealedCfdi40Xml it was validated from. */
+  readonly sha256: string;
+  readonly certificate: Cfdi40CertificateBinding;
+  readonly preSealSha256: string;
+  readonly originalStringSha256: string;
+  readonly xsd: {
+    /** SHA-256 of the official XSD set (cfdv40.xsd and its imports) used. */
+    readonly bundleSha256: string;
+    /** Validator package and version. */
+    readonly engine: string;
+  };
 };
