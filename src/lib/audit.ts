@@ -113,6 +113,64 @@ export const auditCatalog = {
     targetType: "StampedInvoice",
     metadata: ["errorCode", "xsdBundle"],
   },
+  // Fase 5C.8: PAC stamping (sandbox). Ids, provider, fiscal environment and codes only; the
+  // UUID only once verified (FASE5C §25.1). Never the token, XML, Sello, CSD, RFC, amounts or a
+  // raw PAC response.
+  "cfdi.stamp.authorized": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: [
+      "stampAttemptId",
+      "invoiceVersion",
+      "termsVersion",
+      "environment",
+    ],
+    identifiers: ["stampAttemptId"],
+  },
+  "cfdi.stamp.started": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: ["stampAttemptId", "provider", "environment", "reconciliation"],
+    identifiers: ["stampAttemptId"],
+  },
+  "cfdi.stamp.succeeded": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: [
+      "stampAttemptId",
+      "provider",
+      "environment",
+      "resultCode",
+      "uuid",
+    ],
+    identifiers: ["stampAttemptId", "uuid"],
+  },
+  "cfdi.stamp.rejected": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: [
+      "stampAttemptId",
+      "provider",
+      "environment",
+      "resultCode",
+      "providerCode",
+      "failureClass",
+    ],
+    identifiers: ["stampAttemptId"],
+  },
+  "cfdi.stamp.unknown": {
+    scope: "TENANT",
+    targetType: "StampedInvoice",
+    metadata: [
+      "stampAttemptId",
+      "provider",
+      "environment",
+      "resultCode",
+      "providerCode",
+      "detailCode",
+    ],
+    identifiers: ["stampAttemptId"],
+  },
   "invoice.stamp_authorized": {
     scope: "TENANT",
     targetType: "StampedInvoice",

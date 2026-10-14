@@ -382,18 +382,23 @@ test("only a CFDI sealed and registered by ORBIT can reach the XSD gate or a PAC
   assert.throws(() => pacSubmission(unsigned), notXsdValidated);
   assert.throws(() => validateSealedCfdi40Xsd(forged, xsd), notSealed);
 
-  // Fase 5C.6: exactly one place registers a sealed CFDI, createSealedCfdi40, and only after
-  // the Sello verification that throws CFDI_SEAL_VERIFICATION_FAILED.
+  // Fase 5C.6/5C.8: exactly two places register a sealed CFDI: createSealedCfdi40 and, only
+  // to reconcile bytes it produced, restoreSealedCfdi40; each registers only after the Sello
+  // verification that throws CFDI_SEAL_VERIFICATION_FAILED.
   const source = await readFile("src/lib/cfdi40/sealed.ts", "utf8");
-  assert.equal(source.match(/registry\.add\(/g)?.length, 1);
-  const constructor = source.slice(
-    source.indexOf("export function createSealedCfdi40("),
-  );
-  assert(
-    constructor.lastIndexOf('"CFDI_SEAL_VERIFICATION_FAILED"') <
-      constructor.indexOf("registry.add(") &&
-      constructor.indexOf('"CFDI_SEAL_VERIFICATION_FAILED"') > 0,
-  );
+  assert.equal(source.match(/registry\.add\(/g)?.length, 2);
+  for (const name of ["createSealedCfdi40", "restoreSealedCfdi40"]) {
+    const start = source.indexOf(`export function ${name}(`);
+    const end = source.indexOf("\nexport function", start + 1);
+    const constructor = source.slice(start, end === -1 ? undefined : end);
+    assert(start > 0 && constructor.includes("registry.add("), name);
+    assert(
+      constructor.lastIndexOf('"CFDI_SEAL_VERIFICATION_FAILED"') <
+        constructor.indexOf("registry.add(") &&
+        constructor.indexOf('"CFDI_SEAL_VERIFICATION_FAILED"') > 0,
+      name,
+    );
+  }
   for (const file of await readdir("src/lib/cfdi40"))
     if (!["types.ts", "sealed.ts"].includes(file))
       assert(

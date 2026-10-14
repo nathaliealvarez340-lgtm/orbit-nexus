@@ -49,12 +49,14 @@ const manifest = JSON.parse(
   readFileSync("src/lib/sat/cfdi40/manifest.json", "utf8"),
 );
 const allowed = new Map(manifest.resources.map((r) => [r.url, r]));
+const xsdKinds = new Set(["XSD", "TFD_XSD"]);
+const xsltKinds = new Set(["XSLT", "XSLT_INCLUDE", "TFD_XSLT"]);
 const selected = manifest.resources.filter((r) =>
   only === "ALL"
     ? true
     : only === "XSD"
-      ? r.kind === "XSD"
-      : r.kind === "XSLT" || r.kind === "XSLT_INCLUDE",
+      ? xsdKinds.has(r.kind)
+      : xsltKinds.has(r.kind),
 );
 const maxBytes = 20 * 1024 * 1024;
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
@@ -126,11 +128,7 @@ for (const entry of selected) {
     "|",
     response.headers.get("last-modified") ?? "",
   );
-  if (
-    entry.kind === "XSD" ||
-    entry.kind === "XSLT" ||
-    entry.kind === "XSLT_INCLUDE"
-  )
+  if (xsdKinds.has(entry.kind) || xsltKinds.has(entry.kind))
     for (const reference of references(bytes.toString("utf8")))
       if (!allowed.has(reference))
         unknown.push(`${entry.name} -> ${reference}`);

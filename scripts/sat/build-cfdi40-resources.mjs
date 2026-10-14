@@ -1,4 +1,4 @@
-// Versions the official CFDI 4.0 technical resources (Fase 5C.4, 5C.5, 5C.7).
+// Versions the official CFDI 4.0 technical resources (Fase 5C.4, 5C.5, 5C.7, 5C.8).
 // To obtain the files, use scripts/sat/fetch-cfdi40-resources.mjs (allowlisted SAT URLs into
 // an empty staging directory, with a diff against this manifest); review, then run this.
 //
@@ -29,6 +29,11 @@ import {
   buildCfdi40XsdBundle,
   writeCfdi40XsdBundle,
 } from "./cfdi40-xsd-bundle.mjs";
+import {
+  addTfd11Resources,
+  buildTfd11Bundle,
+  writeTfd11Bundle,
+} from "./tfd11-bundle.mjs";
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((pairs, value, index, all) => {
@@ -245,11 +250,19 @@ const manifest = {
 };
 // Fase 5C.7: XSD namespaces, import graph (closed) and the runtime XSD bundle.
 const xsdBundle = buildCfdi40XsdBundle(manifest);
+// Fase 5C.8: the Timbre Fiscal Digital 1.1 XSD and XSLT (same --dir layout).
+addTfd11Resources(manifest, {
+  dir: args.dir,
+  obtainedAt: args["obtained-at"],
+  replace: args.replace,
+});
+const tfdBundle = buildTfd11Bundle(manifest);
 writeFileSync(
   path.join(output, "manifest.json"),
   JSON.stringify(manifest, null, 2) + "\n",
 );
 writeCfdi40XsdBundle(xsdBundle, output);
+writeTfd11Bundle(tfdBundle, output);
 writeFileSync(
   path.join(output, "cadenaoriginal-xslt.json"),
   JSON.stringify({ root: root.url, resources: bundle }, null, 2) + "\n",

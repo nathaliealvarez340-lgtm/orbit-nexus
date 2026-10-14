@@ -26,9 +26,31 @@ export type Cfdi40XsdDiagnostic = {
   /** Element path reported by the engine (prefix:name[index] steps), when known. */
   xpath?: string;
 };
+/**
+ * Fase 5C.8: an element as the engine parsed it (namespace URI and local name; attributes
+ * without namespace declarations). Read from the same parse that was validated, so a
+ * structural comparison never depends on a second parser.
+ */
+export type Cfdi40XmlNode = {
+  readonly namespace: string;
+  readonly name: string;
+  readonly attributes: readonly {
+    readonly namespace: string;
+    readonly name: string;
+    readonly value: string;
+  }[];
+  readonly children: readonly Cfdi40XmlNode[];
+  /** True when the element holds non-whitespace text (no CFDI 4.0 element does). */
+  readonly text: boolean;
+};
 export interface Cfdi40CompiledXsd {
   /** Parses and validates exactly these bytes; [] means valid. Throws only on engine failure. */
   validate(bytes: Uint8Array): Cfdi40XsdDiagnostic[];
+  /** Like validate, and when valid also returns the element tree of that same parse. */
+  inspect?(bytes: Uint8Array): {
+    diagnostics: Cfdi40XsdDiagnostic[];
+    tree: Cfdi40XmlNode | null;
+  };
 }
 /**
  * XSD engine port. The engine parses the root schema itself and loads every import only

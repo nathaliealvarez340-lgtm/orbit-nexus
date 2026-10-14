@@ -69,6 +69,9 @@ model Organization {
   fiscalExtractions FiscalDocumentExtraction[]
   auditEvents     AuditEvent[]
   csdCertificates CsdCertificate[]
+  stampingEntitlement StampingEntitlement?
+  stampAuthorizations StampAuthorization[]
+  stampAttempts   StampAttempt[]
 }
 
 model Membership {
@@ -475,6 +478,8 @@ model StampedInvoice {
   readyAt          DateTime?
   idempotencyKey   String?
   concepts         StampedInvoiceConcept[]
+  stampAuthorizations StampAuthorization[]
+  stampAttempts    StampAttempt[]
   xmlUrl           String?
   pdfUrl           String?
   createdAt        DateTime                @default(now())
@@ -1012,4 +1017,110 @@ model CsdPrivateKey {
 
   @@unique([organizationId, csdCertificateId])
   @@index([kekProvider, kekId, kekVersion])
+}
+
+// Fase 5C.8 (docs/tasks/FASE5C8-PAC-SANDBOX.md §5-9): PAC stamping attempts. Same values as
+// the shared TS contract StampAttemptStatus (src/types/stamping.ts). UNKNOWN = the PAC may
+// have stamped: never retried blindly, never turned into FAILED automatically.
+enum StampAttemptStatus {
+  PENDING
+  SIGNING
+  SUBMITTING
+  WAITING_PROVIDER
+  SUCCEEDED
+  FAILED
+  UNKNOWN
+}
+
+// Why a FAILED attempt failed: before submission, or an explicit PAC rejection that may
+// succeed later unchanged (credential, balance, rate limit) or not (fiscal validation).
+enum StampFailureClass {
+  PRE_SUBMIT
+  REJECTED_RETRYABLE
+  REJECTED_FINAL
+}
+
+// FASE5C3 §Z.3: operator-managed (no self-service API). Stamping needs an enabled row whose
+// environment is the fiscal environment of the server.
+model StampingEntitlement {
+  organizationId String         @id
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environment    PacEnvironment
+  enabled        Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+// FASE5C §28 / FASE5C3 §AA.9: explicit per-invoice authorization, bound to the exact draft
+// version and the exact terms text; consumed by exactly one StampAttempt.
+model StampAuthorization {
+  id             String             @id
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoiceId      String
+  invoice        StampedInvoice     @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+  invoiceVersion Int
+  // Server-validated actor (evidence; kept even if the user is later removed).
+  userId         String
+  termsVersion   String
+  termsSha256    String             @db.Char(64)
+  acceptedAt     DateTime           @default(now())
+  attempt        StampAttempt?
+
+  @@unique([organizationId, id])
+  @@index([organizationId, invoiceId, acceptedAt])
+}
+
+// One real stamping attempt (FASE5C §18). Never stores a token, password, key or raw PAC
+// response: only the exact sealed XML sent (for reconciliation with the same bytes and
+// CustomID) and, after verification, the stamped XML returned, both private to the tenant.
+model StampAttempt {
+  id                   String             @id
+  organizationId       String
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoiceId            String
+  invoice              StampedInvoice     @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+  invoiceVersion       Int
+  authorizationId      String             @unique
+  authorization        StampAuthorization @relation(fields: [organizationId, authorizationId], references: [organizationId, id], onDelete: Restrict)
+  requestedById        String
+  provider             String
+  adapter              String
+  environment          PacEnvironment
+  // "orbit-" + id: stable for the logical attempt, never fiscal data (SW: max 100 chars).
+  customId             String             @unique
+  // = organizationId:invoiceId while PENDING..SUBMITTING or UNKNOWN: one active attempt per
+  // invoice, enforced by the database.
+  activeKey            String?            @unique
+  // = organizationId:invoiceId:invoiceVersion once SUCCEEDED: one stamp per invoice version.
+  succeededKey         String?            @unique
+  status               StampAttemptStatus @default(PENDING)
+  failureClass         StampFailureClass?
+  resultCode           String?
+  detailCode           String?
+  providerCode         String?
+  providerMessage      String?
+  // Exact sealed bytes sent (XsdValidatedCfdi40) and the hashes that pin them.
+  requestSha256        String?            @db.Char(64)
+  preSealSha256        String?            @db.Char(64)
+  originalStringSha256 String?            @db.Char(64)
+  sealedXml            Bytes?
+  // Verified PAC result (StampedCfdi40). uuid is canonical lowercase and unique in ORBIT.
+  uuid                 String?            @unique
+  stampedSha256        String?            @db.Char(64)
+  stampedXml           Bytes?
+  stampedAt            String?
+  rfcProvCertif        String?
+  noCertificadoSat     String?
+  submissionCount      Int                @default(0)
+  startedAt            DateTime           @default(now())
+  submittedAt          DateTime?
+  finishedAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, authorizationId])
+  @@index([organizationId, invoiceId, startedAt])
+  @@index([organizationId, status])
 }

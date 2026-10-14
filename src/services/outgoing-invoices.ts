@@ -543,8 +543,9 @@ function saveResponse(
   };
 }
 
-// Revalidates the document exactly as stored, against the current tenant data.
-async function validateStoredInvoice(
+// Revalidates the document exactly as stored, against the current tenant data. Fase 5C.8: also
+// the fiscal revalidation of the stamping service (injected by the stamp routes).
+export async function validateStoredInvoice(
   db: Db,
   organizationId: string,
   invoice: StoredInvoice,
@@ -881,10 +882,29 @@ export async function revertReadyInvoices(
     status: "READY" as const,
     ...(scope.clientId ? { clientId: scope.clientId } : {}),
   };
-  const ready = await tx.stampedInvoice.findMany({
-    where,
-    select: { id: true },
-  });
+  // Fase 5C.8: the rows are locked (as the stamping service does before creating an attempt),
+  // and an invoice with an active stamping attempt keeps its version: its CFDI is already
+  // sealed or at the PAC. The next attempt revalidates the stored snapshots again.
+  const candidates = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "StampedInvoice"
+    WHERE "organizationId" = ${scope.organizationId} AND "status" = 'READY'
+      AND (${scope.clientId ?? null}::text IS NULL OR "clientId" = ${scope.clientId ?? null})
+    ORDER BY "id"
+    FOR UPDATE`;
+  if (!candidates.length) return 0;
+  const stamping = new Set(
+    (
+      await tx.stampAttempt.findMany({
+        where: {
+          organizationId: scope.organizationId,
+          invoiceId: { in: candidates.map((c) => c.id) },
+          activeKey: { not: null },
+        },
+        select: { invoiceId: true },
+      })
+    ).map((a) => a.invoiceId),
+  );
+  const ready = candidates.filter((c) => !stamping.has(c.id));
   if (!ready.length) return 0;
   await tx.stampedInvoice.updateMany({
     where: { ...where, id: { in: ready.map((r) => r.id) } },
@@ -924,6 +944,9 @@ export async function updateInvoiceDraft(
   const { expectedUpdatedAt, ...data } = updateDraftSchema.parse(input);
   const totals = totalsWithinLimits(data);
   return getDb().$transaction(async (tx) => {
+    // Fase 5C.8: same row lock as the stamping service; a fiscal edit never changes the
+    // version of an invoice whose CFDI is being stamped or awaits reconciliation.
+    await tx.$queryRaw`SELECT "id" FROM "StampedInvoice" WHERE "id" = ${id} AND "organizationId" = ${organizationId} FOR UPDATE`;
     const current = await tx.stampedInvoice.findFirst({
       where: { id, organizationId },
       select: { status: true, updatedAt: true },
@@ -933,6 +956,17 @@ export async function updateInvoiceDraft(
         404,
         "Factura no disponible.",
         "INVOICE_NOT_FOUND",
+      );
+    if (
+      await tx.stampAttempt.findFirst({
+        where: { organizationId, invoiceId: id, activeKey: { not: null } },
+        select: { id: true },
+      })
+    )
+      throw new InvoiceApiError(
+        409,
+        "La factura tiene un timbrado en curso o por verificar; no puede editarse.",
+        "STAMP_IN_PROGRESS",
       );
     if (current.status !== "DRAFT" && current.status !== "READY")
       throw new InvoiceApiError(

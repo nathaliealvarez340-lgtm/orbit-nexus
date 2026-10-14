@@ -149,7 +149,10 @@ test("official SAT resources are versioned locally with origin, date and SHA-256
       .sort(),
     [
       "MatrizDeErrores_CFDI_v40_20260325.xls",
+      // Fase 5C.8: Timbre Fiscal Digital 1.1 (validation of the PAC response).
+      "TimbreFiscalDigitalv11.xsd",
       "cadenaoriginal_4_0.xslt",
+      "cadenaoriginal_TFD_1_1.xslt",
       "catCFDI.xsd",
       "cfdv40.xsd",
       "tdCFDI.xsd",

@@ -716,6 +716,40 @@
       "stored": "resources/sat/cfdi40/xslt/HidrocarburosPetro/hidrocarburospetroliferos.xslt",
       "xsltVersion": "2.0",
       "includes": []
+    },
+    {
+      "name": "TimbreFiscalDigitalv11.xsd",
+      "kind": "TFD_XSD",
+      "version": "1.1",
+      "purpose": "Esquema del complemento Timbre Fiscal Digital 1.1: valida el TFD que devuelve el PAC y el CFDI timbrado (con cfdv40.xsd).",
+      "url": "http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd",
+      "listedOn": "http://omawww.sat.gob.mx/tramitesyservicios/Paginas/anexo_20.htm",
+      "obtainedAt": "2026-10-14",
+      "lastModified": "Sat, 08 Aug 2020 05:16:08 GMT",
+      "etag": "W/\"c99516daa1f7751a07913b374aa65904\"",
+      "bytes": 4732,
+      "sha256": "fb3d061fe9914500bef8beb3ea2e8722ee8a8224fa3af63643877a64c0ea05f7",
+      "stored": "resources/sat/cfdi40/TimbreFiscalDigitalv11.xsd",
+      "namespace": "http://www.sat.gob.mx/TimbreFiscalDigital",
+      "imports": [
+        "http://www.sat.gob.mx/sitio_internet/cfd/tipoDatos/tdCFDI/tdCFDI.xsd"
+      ]
+    },
+    {
+      "name": "cadenaoriginal_TFD_1_1.xslt",
+      "kind": "TFD_XSLT",
+      "version": "1.1",
+      "purpose": "Secuencia oficial de la cadena original del Timbre Fiscal Digital 1.1 (la que firma el SelloSAT).",
+      "url": "http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/cadenaoriginal_TFD_1_1.xslt",
+      "listedOn": "http://omawww.sat.gob.mx/tramitesyservicios/Paginas/anexo_20.htm",
+      "obtainedAt": "2026-10-14",
+      "lastModified": "Sat, 08 Aug 2020 05:19:38 GMT",
+      "etag": "W/\"dfd733aec0420b91dc0bb2215d7319cc\"",
+      "bytes": 2340,
+      "sha256": "d7807e936d5a768cec5dca7a35a8b6dd515287083ca9dd7424c1b722c4b0d5a6",
+      "stored": "resources/sat/cfdi40/cadenaoriginal_TFD_1_1.xslt",
+      "xsltVersion": "2.0",
+      "includes": []
     }
   ]
 }

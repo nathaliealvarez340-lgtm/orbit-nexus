@@ -145,19 +145,26 @@ export function resolveSatXsdImport(
   bundle: Cfdi40XsdBundle,
   location: string,
 ): Uint8Array | null {
+  return isOfficialSatXsdLocation(location)
+    ? (bundle.schemas.get(location)?.bytes ?? null)
+    : null;
+}
+
+/** An absolute official SAT URL exactly as written (shared with the stamped XSD set). */
+export function isOfficialSatXsdLocation(location: string) {
   let url: URL | null = null;
   try {
     url = new URL(location);
   } catch {
     url = null;
   }
-  const official =
+  return (
     url !== null &&
     url.href === location &&
     url.protocol === "http:" &&
     url.host === "www.sat.gob.mx" &&
     !url.search &&
     !url.hash &&
-    !location.split("/").includes("..");
-  return official ? (bundle.schemas.get(location)?.bytes ?? null) : null;
+    !location.split("/").includes("..")
+  );
 }

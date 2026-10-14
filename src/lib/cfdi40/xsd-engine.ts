@@ -2,9 +2,14 @@ import "server-only";
 import type { ErrorDetail } from "libxml2-wasm";
 import {
   validateSealedCfdi40Xsd,
+  type Cfdi40XmlNode,
   type Cfdi40XsdDiagnostic,
   type Cfdi40XsdEngine,
 } from "./schema";
+import { stampedCfdi40XsdSet } from "./stamped-schema";
+import type { StampedVerificationDeps } from "./stamped";
+import { loadTfd11Bundle } from "./tfd-resources";
+import { cfdi40XsltEngine } from "./xslt-engine";
 import { loadCfdi40XsdBundle } from "./xsd-resources";
 import type { SealedCfdi40Xml, XsdValidatedCfdi40 } from "./types";
 
@@ -86,39 +91,82 @@ function createEngine(lib: Libxml2): Cfdi40XsdEngine {
       } finally {
         loader = null;
       }
-      return {
-        validate(bytes) {
-          const before = strays.length;
-          let document: InstanceType<Libxml2["XmlDocument"]>;
+      // The element tree of a validated document (Fase 5C.8), copied out before dispose.
+      const treeOf = (
+        element: InstanceType<Libxml2["XmlElement"]>,
+        depth = 0,
+      ): Cfdi40XmlNode => {
+        if (depth > 32) throw new Error("XSD_TREE_TOO_DEEP");
+        const children: Cfdi40XmlNode[] = [];
+        let text = false;
+        for (let node = element.firstChild; node; node = node.next) {
+          if (node instanceof lib.XmlElement)
+            children.push(treeOf(node, depth + 1));
+          else if (node.content.trim()) text = true;
+        }
+        return Object.freeze({
+          namespace: element.namespaceUri,
+          name: element.name,
+          attributes: Object.freeze(
+            element.attrs.map((attribute) =>
+              Object.freeze({
+                namespace: attribute.namespaceUri,
+                name: attribute.name,
+                value: attribute.value,
+              }),
+            ),
+          ),
+          children: Object.freeze(children),
+          text,
+        });
+      };
+      const run = (bytes: Uint8Array, withTree: boolean) => {
+        const before = strays.length;
+        let document: InstanceType<Libxml2["XmlDocument"]>;
+        try {
+          document = lib.XmlDocument.fromBuffer(bytes, {
+            option: parseOptions,
+          });
+        } catch (error) {
+          if (error instanceof lib.XmlParseError)
+            return {
+              diagnostics: diagnostics(error.details, "PARSE"),
+              tree: null,
+            };
+          throw error;
+        }
+        try {
+          if (document.warnings.length)
+            return {
+              diagnostics: diagnostics(document.warnings, "PARSE"),
+              tree: null,
+            };
           try {
-            document = lib.XmlDocument.fromBuffer(bytes, {
-              option: parseOptions,
-            });
+            validator.validate(document);
           } catch (error) {
-            if (error instanceof lib.XmlParseError)
-              return diagnostics(error.details, "PARSE");
+            if (error instanceof lib.XmlValidateError)
+              return {
+                diagnostics: diagnostics(error.details, "VALIDATE"),
+                tree: null,
+              };
+            if (error instanceof lib.XmlLibError)
+              throw new Error("XSD_ENGINE_ERROR");
             throw error;
           }
-          try {
-            if (document.warnings.length)
-              return diagnostics(document.warnings, "PARSE");
-            try {
-              validator.validate(document);
-            } catch (error) {
-              if (error instanceof lib.XmlValidateError)
-                return diagnostics(error.details, "VALIDATE");
-              if (error instanceof lib.XmlLibError)
-                throw new Error("XSD_ENGINE_ERROR");
-              throw error;
-            }
-            // Validating must not ask for any resource.
-            if (strays.length !== before)
-              throw new Error("XSD_UNEXPECTED_RESOURCE");
-            return [];
-          } finally {
-            document.dispose();
-          }
-        },
+          // Validating must not ask for any resource.
+          if (strays.length !== before)
+            throw new Error("XSD_UNEXPECTED_RESOURCE");
+          return {
+            diagnostics: [] as Cfdi40XsdDiagnostic[],
+            tree: withTree ? treeOf(document.root) : null,
+          };
+        } finally {
+          document.dispose();
+        }
+      };
+      return {
+        validate: (bytes) => run(bytes, false).diagnostics,
+        inspect: (bytes) => run(bytes, true),
       };
     },
   };
@@ -143,4 +191,25 @@ export async function validateOfficialSealedCfdi40Xsd(
     loadCfdi40XsdBundle(),
   ]);
   return validateSealedCfdi40Xsd(sealed, { engine: xsdEngine, bundle });
+}
+
+let stampedDeps: Promise<StampedVerificationDeps> | undefined;
+/**
+ * Fase 5C.8: the official dependencies to verify a PAC response (./stamped.ts): this engine,
+ * the cfdv40 + TFD 1.1 XSD set and the official TFD cadena XSLT with the approved XSLT engine.
+ */
+export function loadStampedVerificationDeps(): Promise<StampedVerificationDeps> {
+  stampedDeps ??= Promise.all([
+    loadCfdi40XsdEngine(),
+    loadCfdi40XsdBundle(),
+    loadTfd11Bundle(),
+  ]).then(([engine, cfdi, tfd]) => ({
+    engine,
+    set: stampedCfdi40XsdSet(cfdi, tfd),
+    xslt: { engine: cfdi40XsltEngine, tfd },
+  }));
+  return stampedDeps.catch((error) => {
+    stampedDeps = undefined;
+    throw error;
+  });
 }

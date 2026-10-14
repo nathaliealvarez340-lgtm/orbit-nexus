@@ -299,3 +299,38 @@ export type XsdValidatedCfdi40 = {
     readonly engine: string;
   };
 };
+
+/** Type-only brand: no value exists, so no object literal can satisfy StampedCfdi40. */
+declare const stampedBrand: unique symbol;
+/**
+ * Fase 5C.8: a CFDI returned by a PAC and verified by ORBIT against the exact XsdValidatedCfdi40
+ * it sent: valid against the official cfdv40 + TFD 1.1 XSD set, fiscal content identical
+ * (only one cfdi:Complemento with one TimbreFiscalDigital added), TFD bound to the Sello sent
+ * and consistent with every parallel field of the PAC. Produced only by verifyStampedCfdi40
+ * (./stamped.ts). The SelloSAT is NOT verified cryptographically (pending gate).
+ */
+export type StampedCfdi40 = {
+  readonly [stampedBrand]: true;
+  readonly stage: "STAMPED";
+  /** The stamped CFDI exactly as the PAC returned it. */
+  readonly xml: string;
+  readonly bytes: Uint8Array;
+  readonly sha256: string;
+  /** SHA-256 of the XsdValidatedCfdi40 bytes that were sent. */
+  readonly sentSha256: string;
+  /** UUID in canonical lowercase (presentation only; the XML keeps it as written). */
+  readonly uuid: string;
+  readonly tfd: {
+    readonly version: "1.1";
+    readonly uuid: string;
+    readonly fechaTimbrado: string;
+    readonly rfcProvCertif: string;
+    readonly noCertificadoSAT: string;
+    readonly leyenda: string | null;
+  };
+  /** SHA-256 of the TFD cadena original produced by the official SAT XSLT. */
+  readonly tfdCadenaOriginalSha256: string;
+  /** Always false in Fase 5C.8: no trusted SAT certificate source yet (pending gate). */
+  readonly satSealVerified: false;
+  readonly xsd: { readonly setSha256: string; readonly engine: string };
+};
