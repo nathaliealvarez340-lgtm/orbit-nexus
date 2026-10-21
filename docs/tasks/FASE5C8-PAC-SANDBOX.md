@@ -1,8 +1,13 @@
 # FASE 5C.8 — PAC sandbox con SW sapien / SmarterWEB
 
-Estado: **implementado y probado contra un SW simulado; prueba real en sandbox NO ejecutada**
-porque no existen credenciales SW de pruebas en ningún entorno (§21). Producción del PAC sigue
-bloqueada. La factura **no** pasa a `ISSUED` en esta fase.
+Estado: **implementado, probado contra un SW simulado y validado en el sandbox real de SW**
+(2026-10-21): un primer timbre histórico (§21.1) y un ciclo crash-safe con timbre nuevo y
+reenvío real desde otro proceso con el mismo CustomID y los mismos bytes (§21.3.1), y la
+recuperación por la ruta productiva `UNKNOWN` → proceso nuevo → `reconcileStampAttempt` real →
+SW `307` → mismo UUID → `SUCCEEDED` (§21.3.2; un primer intento recibió 401 sin timbre). Seis
+POST en total. Producción del
+PAC sigue bloqueada. La factura **no** pasa a `ISSUED` en esta
+fase.
 
 Flujo: autorización explícita por factura → `StampAttempt` (uno activo por factura) → sello
 con el CSD custodiado (5C.6) → XSD oficial (5C.7) → bytes exactos persistidos →
@@ -153,10 +158,13 @@ ni espacios. Es el mismo en cada envío del mismo intento lógico. Un intento nu
 - Durante la reconciliación, cualquier rechazo deja el intento en `UNKNOWN` con
   `detailCode=RECONCILIATION_<código>`: un rechazo ahora no demuestra que el primer envío no se
   haya timbrado.
-- Dentro de las 72 h del CustomID, SW puede contestar `CFDI3307` solo con el UUID. En ese caso
-  el intento sigue `UNKNOWN`. Al expirar el CustomID, el mismo reenvío llega a la validación
-  de sello (`307`), que devuelve el timbre completo. Pendiente de confirmar en vivo
-  (gate `PAC_RECONCILIATION_LIVE_VALIDATED`).
+- Según la documentación, dentro de las 72 h del CustomID SW puede contestar `CFDI3307` solo
+  con el UUID; en ese caso el intento sigue `UNKNOWN`. **Observado en vivo (§21.3.1 y
+  §21.3.2, este último por `reconcileStampAttempt` desde `UNKNOWN`):** el reenvío de los mismos
+  bytes con el mismo CustomID, minutos después del timbre, recibió HTTP 400 `307` con el CFDI
+  completo (SW detectó primero el Sello duplicado), y ORBIT lo verificó contra los bytes
+  enviados. `CFDI3307` **no** fue el comportamiento observado; su manejo sigue basado en la
+  documentación.
 
 ## 10. Política de reintentos
 
@@ -308,27 +316,244 @@ Nunca token, XML, Sello, CSD, RFC, importes ni respuesta cruda. Los eventos de 5
 - Secretos: token solo en el header. Escaneo de DB, auditoría y respuestas en pruebas. La E2E
   revisa respuestas y logs del servidor.
 
-## 21. Prueba real en sandbox — NO ejecutada
+## 21. Prueba real en sandbox — EJECUTADA (2026-10-21): SUCCEEDED
 
-No hay credenciales: ni `SW_SANDBOX_TOKEN` ni ninguna variable SW en el entorno ni en
-`.env` del worktree principal (verificado por nombre, sin leer valores). No se usaron
-credenciales públicas encontradas en internet ni se inventaron.
+### 21.1 Resultado
 
-Para la prueba controlada faltan:
+Un único POST a `https://services.test.sw.com.mx/v4/cfdi33/stamp/v4` desde el servicio real
+(`stampInvoice`) contra PGlite efímero (sin `DATABASE_URL`, sin Neon). `STAMPING_ENABLED`,
+token, KEK y CSD solo en el proceso; nada en `.env`, repo ni DB salvo lo que el servicio
+guarda (sin token ni contraseña: verificado sobre DB, auditoría y respuesta).
 
-1. `SW_SANDBOX_TOKEN`: token de la cuenta de **pruebas** de SW (formulario de SW).
-2. Un **CSD de pruebas oficial** del SAT para sandbox (`.cer`, `.key` y contraseña). SW publica
-   dónde encontrarlo; no es un CSD de cliente.
-3. Para timbrar desde la app (custodia): agregar a `officialTestAuthorities` el certificado de la
-   CA de pruebas del SAT, con SHA-256, URL y fecha (FASE5C3 §M.0/§AB.7). Requiere autorización
-   explícita. Hoy la lista está vacía y ninguna CSD puede custodiarse fuera de las pruebas.
-4. Habilitar `STAMPING_ENABLED=true` y una fila `StampingEntitlement(SANDBOX, enabled)`.
+- **CSD:** EKU9003173C9 (ESCUELA KEMPER URGATE SA DE CV, Sucursal 1), NoCertificado
+  `30001000000500003416`, vigente 2023-05-18 → 2027-05-18, RSA 2048, no CA, SHA-256 del `.cer`
+  `92be3ef4…bb53`, emitido y firmado por "AC UAT" 2022 (la CA ya fijada). Pasa
+  `validateCsdUpload` completo en SANDBOX; rechazado en PRODUCTION (`CSD_ENVIRONMENT_MISMATCH`),
+  con otro RFC (`CSD_RFC_MISMATCH`) y con contraseña errónea (`CSD_PASSWORD_INVALID`). La
+  custodia (`configureCsd`) lo deja `VALID`.
+- **Datos autorizados:** emisor `EKU9003173C9` / `ESCUELA KEMPER URGATE` / 601 / CP 42501;
+  receptor `URE180429TM6` / `UNIVERSIDAD ROBOTICA ESPAÑOLA` / 601 / CP 86991 / G01 (contrastados
+  por el usuario con el Excel de SW, la tabla vigente de CSD de pruebas y ejemplos de SW).
+- **CFDI:** I, MXN, PUE, FormaPago 03, Exportacion 01, Folio ORB-000001; un concepto
+  `84111500` / E48 / 1 × 100.00, ObjetoImp 02, IVA 002 Tasa 0.160000 = 16.00; SubTotal 100.00,
+  Total 116.00. La clave `84111506` (propuesta inicial) está en el c_ClaveProdServ oficial pero
+  no en el subconjunto que ORBIT verifica para READY (`CONCEPT_PRODUCT_CODE_UNVERIFIED`); no se
+  relajó el gate y se usó `84111500`, presente en ambos.
+- **Pipeline:** borrador con los mismos snapshots y cálculos que `createInvoiceDraft` →
+  `validateStoredInvoice` (`canMarkReady=true`, sin issues) → READY → autorización explícita →
+  `StampAttempt` → PreSeal → cadena original (XSLT oficial) → sello CSD → `SealedCfdi40` → XSD
+  oficial → `XsdValidatedCfdi40` (3 651 B) → bytes y hashes persistidos → POST. El perfil fiscal
+  efímero llevó una CSF y un domicilio marcados como *placeholder* de sandbox, que ORBIT exige
+  para READY y que no forman parte del CFDI 4.0.
+- **Envío:** `connectRetries: 0`, transporte con candado de una sola llamada y marcador que
+  impide una segunda ejecución live. CustomID `orbit-ad09e587-…-69306fdc2ccb`. El cuerpo
+  multipart contenía exactamente los bytes validados por XSD.
+- **Respuesta:** HTTP 200 `application/json` → `PAC_STAMPED` → `SUCCEEDED`, `submissionCount=1`.
+  UUID `222cfe39-…-…4315` (sandbox), FechaTimbrado `2026-10-21T14:27:24`, RfcProvCertif
+  `SPR190613I52`, NoCertificadoSAT `30001000000500003456`.
+- **Verificación (servicio + re-verificación independiente):** TFD 1.1 válido; `SelloCFD` =
+  `Sello` enviado; `selloCFDI` y `noCertificadoCFDI` de SW = lo enviado; `cadenaOriginalSAT` de
+  SW = la cadena de la XSLT oficial del TFD; contenido fiscal sin cambios; XSD final
+  cfdv40 + TFD 1.1 válido; CFDI guardado tal como lo devolvió SW (mismo SHA-256); UUID único en
+  ORBIT; la factura sigue READY, sin UUID ni `ISSUED`. `satSealVerified=false` (§17).
+- **Observado en vivo:** SW no altera el `schemaLocation` raíz ni nada fiscal (riesgo §24
+  descartado para este caso); la respuesta v4 trae `cfdi` completo.
+- **No ejecutado en este ciclo:** el segundo envío con el mismo CustomID (§9); la instrucción
+  fue un único POST. La reconciliación real se hizo después en un ciclo nuevo (§21.3); este
+  primer intento no se reconstruyó ni se reutilizó.
+- **Reconciliación de este intento imposible:** el intento vivió en PGlite efímero, que se cerró al
+  terminar el proceso. De la primera ejecución solo se conservaron el CustomID, el SHA-256 de
+  los bytes enviados (`ceaa25a8…24e9`) y el UUID redactado; ni los bytes exactos ni el
+  `StampAttempt` original. Un reenvío idéntico exige reconstruirlos (mismo Fecha, re-firma
+  determinista RSA PKCS#1 v1.5 y comprobación del SHA-256 antes de enviar), lo que no se hizo sin
+  autorización. Lección: la prueba de reconciliación debe correr en el mismo proceso, o con una
+  base local persistente, que el primer envío.
+- Estabilidad: `npm test` 3/3 corridas secuenciales en verde (280/280) el 2026-10-21. El fallo
+  único observado antes no se reprodujo.
 
-Con eso, la prueba es una sola factura de prueba:
+### 21.2 Antecedentes (CA de pruebas y primer CSD)
 
-1. Timbrarla con un CustomID único y verificar el TFD.
-2. Repetir el mismo CustomID para observar la respuesta real de duplicado (§9).
-3. Documentar solo la evidencia segura: códigos, hashes y UUID de sandbox.
+Estado previo al 2026-10-21:
+
+1. `SW_SANDBOX_TOKEN` y el CSD oficial de pruebas se entregan solo como variables de proceso
+   de la sesión (`SW_SANDBOX_TOKEN`, `SW_TEST_CSD_CER`, `SW_TEST_CSD_KEY`,
+   `SW_TEST_CSD_PASSWORD`; las tres últimas son rutas y contraseña fuera del repo). Nunca en
+   `.env`, archivos versionados, DB ni logs.
+2. CSD oficial: KIJ0906199R1 (Sucursal 1), NoCertificado `30001000000500003437`, vigente
+   2023-05-18 → 2027-05-18, SHA-256 del `.cer` `90561071…0545`. Pasa todo el flujo §M de ORBIT
+   (DER, RSA 2048, vigencia, RFC, NoCertificado, CA oficial, PKCS#8 cifrado, contraseña, par).
+3. **CA de pruebas autorizada y agregada** a `officialTestAuthorities`: "AC UAT" del SAT
+   (2022-03-04 → 2030-03-04, RSA 4096, `CA:TRUE pathlen:0`, SHA-256 `ff9c2203…acf9`),
+   archivo `Certificados_UAT_2022/AC_UAT_2022.crt` de
+   `http://omawww.sat.gob.mx/tramitesyservicios/Paginas/documentos/Certificados_P.zip`
+   ("Certificados padre…", página SAT de Certificados de Sello Digital; el host no responde en
+   443, se descargó por HTTP sin redirects; SHA-256 del zip `38832970…203a`). Verificado:
+   `checkIssued` y firma del CSD con su llave; la CA verifica contra la raíz de pruebas
+   "Agencia Certficadora Raiz Beta ANG" del mismo archivo. El "AC UAT" de 2018 del mismo
+   archivo tiene casi el mismo subject y **no** verifica el CSD (por eso nunca basta el nombre).
+   Pruebas: `tests/csd-crypto.test.ts` (CA fijada; impostor con el subject exacto rechazado;
+   CSD oficial aceptado en SANDBOX y rechazado en PRODUCTION, fuera de vigencia y con otro RFC
+   —esta última solo con las variables presentes—). Efecto: en fiscal SANDBOX con KeyProvider
+   la custodia queda disponible para CSD de prueba del SAT, también en un build de producción
+   (FASE5C3 §G.1: `env` permitido en SANDBOX solo con CSD de prueba).
+4. **Bloqueo (resuelto con el CSD EKU, §21.1):** la tabla vigente de SW
+   (developers.sw.com.mx/knowledge-base/donde-encuentro-csd-de-pruebas-vigentes/) publica
+   para KIJ0906199R1 solo RFC, SCNF=No, VALIDEZ OBLIGACIONES=1 ("habilitado para facturar, IVA
+   exento, tasa 0% y 16%"), NOMBRE `KERNEL INDUSTIA JUGUETERA`, CP `28971` y RETENCION=0.
+   **No publica RegimenFiscal** ni receptor de pruebas. No se inventa: falta una fuente
+   oficial para `Emisor/@RegimenFiscal` y la confirmación del receptor antes del único POST.
+5. Falta además habilitar `STAMPING_ENABLED=true` (solo en el proceso local) y una fila
+   `StampingEntitlement(SANDBOX, enabled)` en la DB efímera.
+
+Plan original de la prueba: (1) timbrar con un CustomID único y verificar el TFD — **hecho**
+(§21.1); (2) repetir el mismo CustomID para observar el duplicado real (§9) — **pendiente**, con
+autorización aparte; (3) documentar solo evidencia segura — hecho.
+
+### 21.3 Recuperación crash-safe del intento
+
+La reconciliación de §9 solo es segura si el intento sobrevive a la muerte del proceso que lo
+envió. El flujo es:
+
+persistir la solicitud exacta → commit → envío → resultado incierto o éxito → muere el proceso →
+proceso nuevo → recupera la solicitud exacta → mismo CustomID → reconciliación → mismo UUID.
+
+- **Antes del envío** (`src/services/cfdi40-stamp.ts`, transición `SIGNING → SUBMITTING`): se
+  confirman en la DB, fuera de cualquier transacción abierta durante el HTTP, el intento (id,
+  CustomID `orbit-<id>`, factura y versión, autorización), los bytes exactos del
+  `XsdValidatedCfdi40` (`sealedXml`), `requestSha256`, `preSealSha256`, `originalStringSha256` y
+  `submissionCount+1`. Solo después se llama a `pac.stamp`.
+- **Reconciliación desde otro proceso**: `reconcileStampAttempt` (§9) restaura esos bytes con
+  `restoreSealedCfdi40` (mismo SHA-256, cadena recalculada con la XSLT oficial = la firmada, Sello
+  verificado) y los reenvía con el mismo CustomID. Nada se reconstruye, re-fecha ni re-firma.
+- **Evidencia a prueba de manipulación en la DB** (migración
+  `202610210001_phase5c8_crash_safe_stamping`, aditiva, no aplicada a Neon): CHECKs que exigen
+  que bytes y hashes existan juntos y que `requestSha256 = sha256(sealedXml)` (y lo mismo para
+  el CFDI timbrado); trigger que vuelve inmutables la identidad del intento (incluidos
+  Organization, factura, versión, autorización y CustomID), la solicitud una vez persistida y el
+  timbre una vez registrado; `submissionCount` solo crece; un intento que pudo llegar al PAC no
+  se borra; `StampAuthorization` no se edita. CHECKs y triggers no se representan en el schema
+  de Prisma.
+- **Prueba** (`tests/cfdi40-stamp-crash-recovery.test.ts`, dos procesos del SO y un directorio
+  PGlite persistente, PAC **simulado**): el proceso A (`tests/fixtures/stamp-crash-child.ts`)
+  autoriza, sella, valida XSD, persiste y muere (`exit 99`) en cuanto el PAC recibe la solicitud;
+  el proceso B reabre la DB, encuentra el mismo intento en `SUBMITTING` con el CustomID, el
+  `requestSha256` y los bytes que recibió el PAC, comprueba que la DB rechaza alterar cualquiera
+  de ellos y reconcilia: `CFDI3307` solo con UUID → sigue `UNKNOWN`; con el CFDI → `SUCCEEDED`,
+  el mismo intento, `submissionCount=3`, cada reenvío con los mismos bytes y CustomID.
+
+#### 21.3.1 Ciclo real en SW sandbox (2026-10-21): timbre nuevo + reconciliación
+
+Scripts únicos fuera del repo (necesitan token y CSD del proceso), PGlite **persistente** en
+un directorio temporal fuera del repo, sin `DATABASE_URL` ni Neon, con el mismo pipeline de
+§21.1 (`configureCsd` con el CSD EKU, `validateStoredInvoice`, `stampInvoice`) y los mismos
+datos autorizados: emisor `EKU9003173C9` / `ESCUELA KEMPER URGATE` / 601 / CP 42501; receptor
+`URE180429TM6` / `UNIVERSIDAD ROBOTICA ESPAÑOLA` / 86991 / 601 / G01. CFDI nuevo (otra Fecha,
+otro Sello), CustomID nuevo; el intento de §21.1 no se reutilizó.
+
+1. **Dry run (sin red).** El stub del PAC registró los bytes recibidos y mató el proceso
+   (`exit 97`) en el límite del PAC. Antes, desde la misma sesión de DB: intento `SUBMITTING`,
+   CustomID, `requestSha256` = SHA-256 de los bytes recibidos = `sha256(sealedXml)`,
+   `preSealSha256` y `originalStringSha256`, `submissionCount=1`, autorización de la misma
+   versión y ningún xid de transacción asignado (sin transacción con escrituras abierta). Un
+   proceso nuevo, sin token, reabrió la DB: 12/12 comprobaciones, incluidos los bytes idénticos
+   y la restauración como lo hace `reconcileStampAttempt`.
+2. **POST 1 (nuevo).** Las mismas comprobaciones, contra el cuerpo multipart real, pasaron antes
+   del `fetch` (`connectRetries: 0`, candado de una llamada, marcador). HTTP 200 → `PAC_STAMPED`
+   → `SUCCEEDED`, `submissionCount=1`, 3 651 B, `requestSha256` `5a404136…8dfd`. UUID
+   `5fd79d33-…-…e662` (completo solo en la DB local), FechaTimbrado `2026-10-21T15:46:50`,
+   RfcProvCertif `SPR190613I52`, NoCertificadoSAT `30001000000500003456`. TFD 1.1, `SelloCFD` =
+   Sello enviado, `cadenaOriginalSAT` = XSLT oficial del TFD, XSD final CFDI + TFD, contenido
+   fiscal sin cambios, UUID único; la factura sigue READY sin UUID. El proceso terminó y cerró
+   la DB.
+3. **Proceso nuevo (sin token).** Recuperó el mismo intento: CustomID, `requestSha256`, bytes
+   idénticos a los capturados del multipart, hashes, autorización, `SUCCEEDED`, UUID completo
+   canónico, `stampedXml` fijado por su hash y con el mismo UUID: 16/16.
+4. **POST 2 (reconciliación), desde otro proceso nuevo.** `reconcileStampAttempt` solo reclama
+   intentos `UNKNOWN` (o `SUBMITTING` obsoletos); este estaba `SUCCEEDED`, así que el script
+   restauró los bytes persistidos con las mismas funciones (`restoreSealedCfdi40` + XSD),
+   confirmó `submissionCount=2` **antes** del envío, comprobó en el multipart los mismos bytes,
+   SHA-256 y CustomID, y envió una sola vez con el adaptador real. Respuesta: HTTP 400, código
+   SW `307` (CFDI previamente timbrado) con el CFDI completo → `EVIDENCE` /
+   `PAC_PREVIOUSLY_STAMPED`. Verificación completa (TFD 1.1, `SelloCFD`, `cadenaOriginalSAT`,
+   XSD final, mismo `sentSha256`, misma FechaTimbrado). UUID recibido = UUID persistido
+   (igualdad exacta de 36 caracteres, comparada internamente). Después: 1 intento, 1 UUID, 1
+   factura, 1 autorización; el intento sigue `SUCCEEDED` con UUID y `stampedSha256` sin
+   cambios; `submissionCount=2`. Ni token ni contraseña en DB ni auditoría.
+
+**Comportamiento real de SW observado:**
+
+- Ante el mismo Sello y el mismo CustomID dentro de las 72 h, SW respondió `307` (por Sello),
+  no `CFDI3307` (por CustomID), y devolvió el CFDI completo con el mismo UUID y la misma
+  FechaTimbrado.
+- El CFDI del `307` **no** es idéntico byte a byte al devuelto en el timbre original (otro
+  SHA-256), aunque verifica igual y lleva el mismo timbre. No se guardó la segunda respuesta,
+  así que no se sabe qué cambió (probablemente serialización). ORBIT conserva el CFDI del primer
+  timbre y no lo sustituye (el trigger lo impide).
+
+**Límites de este ciclo (resueltos en §21.3.2):**
+
+- El segundo POST lo hizo el script, no `reconcileStampAttempt`, porque el servicio no reabre un
+  intento `SUCCEEDED`. La ruta productiva `UNKNOWN → reconcileStampAttempt` se validó después en
+  vivo (§21.3.2).
+- `SelloSAT` sigue sin verificación criptográfica (`TFD_SAT_SEAL_VERIFIED=false`).
+
+Conclusión: comportamiento de duplicado de SW en vivo **VALIDADO**.
+
+#### 21.3.2 Recuperación por la ruta productiva en vivo — VALIDADA
+
+Objetivo: POST real → resultado ambiguo para ORBIT → `UNKNOWN` → reinicio del proceso →
+`reconcileStampAttempt` real → SW → mismo UUID → `SUCCEEDED`, sin cambiar el servicio ni el
+adaptador. `SUCCEEDED` sigue siendo terminal.
+
+- **Inyección del fallo (solo en el harness, fuera del repo):** `stampInvoice` y el adaptador SW
+  reales; el `transport` que recibe el adaptador deja pasar el `fetch` real, lee la respuesta
+  completa, guarda en privado solo hashes (nunca UUID ni XML) y **no** la entrega: lanza
+  `ECONNRESET`, que el adaptador de producción clasifica como `UNKNOWN / PAC_CONNECTION_LOST`.
+  El proceso B usa `reconcileStampAttempt` con el adaptador real y un `transport` que solo
+  observa (candado, marcador, bytes en el cable) y devuelve la respuesta intacta.
+- **Dry run (sin red), en verde:** A terminó en `UNKNOWN / PAC_CONNECTION_LOST` (no `FAILED`),
+  con intento, CustomID, bytes, hashes, autorización y `submissionCount=1` persistidos antes del
+  envío. B, en un proceso nuevo sin token: 16/16 comprobaciones; `reconcileStampAttempt` reclamó
+  el intento (`SUBMITTING`, `submissionCount=2` confirmado antes del envío), envió los mismos
+  bytes con el mismo CustomID y, ante una negativa simulada, lo dejó `UNKNOWN`, sin sello nuevo.
+- **POST 1 real (2026-10-21, CFDI nuevo, folio ORB-000003):** las comprobaciones previas al
+  envío pasaron, pero SW respondió **HTTP 401** (`status: error`, sin CFDI ni UUID): rechazo de
+  autenticación, **no hubo timbre**. El token había funcionado en los dos POST anteriores del
+  mismo día; no se determinó la causa sin hacer más llamadas. Conforme a la instrucción ante un
+  rechazo, **no** se hizo la reconciliación ni ningún otro envío. El intento local quedó
+  `UNKNOWN` solo porque el harness ocultó el 401 (sin la inyección, el adaptador lo habría
+  clasificado `FAILED / REJECTED_RETRYABLE`, `PAC_AUTH_FAILED`).
+- **Repetición con token válido (2026-10-21, otro CFDI nuevo, CustomID nuevo): VALIDADA.**
+  1. **Proceso A:** POST real con `stampInvoice` y el adaptador SW reales; SW timbró, el
+     `transport` del harness retuvo la respuesta y lanzó `ECONNRESET` → el intento quedó
+     `UNKNOWN / PAC_CONNECTION_LOST`, `submissionCount=1`, con CustomID, `requestSha256` y
+     `sealedXml` persistidos antes del envío. El proceso terminó.
+  2. **Proceso B (nuevo, recuperación cross-process):** recuperó el mismo intento `UNKNOWN` con
+     `submissionCount=1`, el mismo CustomID, el mismo `requestSha256` y los mismos bytes
+     `sealedXml`. No se reconstruyó, re-serializó ni re-firmó nada.
+  3. **`reconcileStampAttempt` real**, observado antes del POST (dentro del `transport`):
+     intento reclamado (`SUBMITTING`), `submissionCount=2` ya confirmado en la DB, ninguna
+     transacción abierta, en el cable los mismos bytes persistidos, el mismo SHA-256 y el mismo
+     CustomID.
+  4. **Respuesta de SW:** HTTP 400, código SW **`307`** ("CFDI previamente timbrado") con el
+     CFDI completo (UUID de 36 caracteres).
+  5. **Resultado en ORBIT:** `UNKNOWN → reconcileStampAttempt → SUCCEEDED`, `resultCode`
+     `PAC_PREVIOUSLY_STAMPED`, `providerCode` `307`, `submissionCount=2`, UUID y `stampedXml`
+     persistidos. El UUID persistido es igual al de la respuesta de reconciliación y al del
+     timbre que SW emitió en el POST 1 (misma identidad lógica: comparación interna del UUID
+     completo; el UUID no se documenta). La factura sigue **READY**, no `ISSUED`;
+     `satSealVerified=false`; el token no aparece en la DB ni en la auditoría.
+- **Comportamiento observado:** SW respondió **`307`** (duplicado por Sello). **`CFDI3307`
+  (duplicado por CustomID) NO fue el comportamiento observado** en ninguno de los dos ciclos
+  reales; ORBIT lo sigue soportando según la documentación (§9) y las pruebas simuladas.
+- **Conclusión:** POST real → resultado ambiguo → `UNKNOWN` → reinicio del proceso →
+  `reconcileStampAttempt` real → SW `307` → mismo UUID → `SUCCEEDED` demostrado en vivo.
+  `PAC_RECONCILIATION_LIVE_VALIDATED = true`.
+- **Pruebas automáticas añadidas** (`tests/cfdi40-stamp-service.test.ts`, PAC simulado):
+  `SUCCEEDED` y `FAILED` no se reconcilian ni se reenvían; `UNKNOWN` se reconcilia con el mismo
+  CustomID y los mismos bytes, con una custodia que no puede abrir el CSD y sin evento
+  `cfdi.sealed` nuevo (no se vuelve a firmar); un `requestSha256` que no corresponde a los bytes
+  lo rechaza el CHECK y, sin el CHECK, el servicio (`STORED_REQUEST_CORRUPT`, nada se envía).
 
 ## 22. Pruebas
 
@@ -336,11 +561,14 @@ Con eso, la prueba es una sola factura de prueba:
 |---|---|
 | `tests/pac-sw-adapter.test.ts` (10) | Configuración y allowlist; request exacto (URL, POST, Bearer, `customid`, multipart con los bytes exactos, `redirect: manual`, signal); clasificación de todas las respuestas documentadas; `UNKNOWN` para 5xx, redirect, JSON inválido, tipo erróneo, excesivo, truncado y éxito sin CFDI; timeout y reset después de enviar sin reintento; reintento solo sin conexión; el token nunca aparece |
 | `tests/cfdi40-stamped.test.ts` (13) | Recursos TFD byte a byte y fail-closed; conjunto XSD contenedor con loads exactos; los 10 CFDI soportados verificados; re-serialización equivalente aceptada; contenido fiscal alterado rechazado; 18 problemas de TFD; XXE, DTD, entidades, comentario, CDATA, PI, XInclude, no UTF-8, malformado y excesivo; campos paralelos falsos; TFD de otro CFDI; restauración para reconciliación; sin red, archivos ni consola; gate del SelloSAT pendiente |
-| `tests/cfdi40-stamp-service.test.ts` (13, PGlite) | Gates sin escrituras ni envíos; autorización y versión; éxito con bytes persistidos y auditoría sin secretos; idempotencia; concurrencia (dos sesiones → un intento, una llamada, un UUID); rechazos final y reintentable; `UNKNOWN` → `RECONCILIATION_REQUIRED` → reconciliación con mismos bytes y CustomID (UUID solo → sigue `UNKNOWN`; timbre completo → `SUCCEEDED`); nunca llegó; `307` por sello; rechazo en reconciliación → sigue `UNKNOWN`; respuesta inconsistente; UUID duplicado; multi-tenant (incluida FK); intentos obsoletos; fallo antes de enviar; bytes guardados alterados; CSD deshabilitado; token ausente de DB y auditoría |
+| `tests/cfdi40-stamp-service.test.ts` (14, PGlite) | Gates sin escrituras ni envíos; límites de la reconciliación (`SUCCEEDED`/`FAILED` terminales, sin volver a firmar, `requestSha256` desajustado falla cerrado); autorización y versión; éxito con bytes persistidos y auditoría sin secretos; idempotencia; concurrencia (dos sesiones → un intento, una llamada, un UUID); rechazos final y reintentable; `UNKNOWN` → `RECONCILIATION_REQUIRED` → reconciliación con mismos bytes y CustomID (UUID solo → sigue `UNKNOWN`; timbre completo → `SUCCEEDED`); nunca llegó; `307` por sello; rechazo en reconciliación → sigue `UNKNOWN`; respuesta inconsistente; UUID duplicado; multi-tenant (incluida FK); intentos obsoletos; fallo antes de enviar; bytes guardados alterados; CSD deshabilitado; token ausente de DB y auditoría |
+| `tests/cfdi40-stamp-crash-recovery.test.ts` (1, dos procesos, PGlite persistente) | El proceso A persiste y muere al llegar la solicitud al PAC; el proceso B recupera el mismo intento, CustomID, `requestSha256` y bytes; la DB rechaza alterarlos; reconciliación sin reconstruir nada (§21.3) |
 | `scripts/pac-sandbox-e2e.mjs` (6, `next start`) | Sesión y plan; contrato de estado; mismo origen, autorización y gates sin escrituras; MEMBER y otra Organization; bloqueo de edición `STAMP_IN_PROGRESS` y reversión de READY que respeta el intento activo; nada sensible en respuestas ni logs |
 
-El SW de las pruebas es una **simulación** de las formas documentadas; no prueba nada del PAC
-real (gate `PAC_SANDBOX_LIVE_VALIDATED=false`).
+El SW de las pruebas es una **simulación** de las formas documentadas. El PAC real se probó
+fuera de la suite (§21.1, §21.3.1 y §21.3.2) con scripts únicos que no se versionan porque necesitan el
+token y el CSD del proceso. `tests/csd-crypto.test.ts` acepta el CSD oficial KIJ o EKU (fijados por
+SHA-256) cuando las variables `SW_TEST_CSD_*` están presentes.
 
 ## 23. Gates
 
@@ -348,11 +576,11 @@ real (gate `PAC_SANDBOX_LIVE_VALIDATED=false`).
 |---|---|
 | `XSD_OFFICIAL_VALIDATION_READY` (5C.7) | true |
 | `CSD_TYPE_VERIFIED` | false |
-| `OFFICIAL_CSD_FIXTURE_VALIDATED` | false |
+| `OFFICIAL_CSD_FIXTURE_VALIDATED` | **true**: §M.7/§M.8 sobre CSD oficiales KIJ y EKU + timbre real (§21.1); solo persona moral |
 | `POSTGRES_CSD_CONCURRENCY_VALIDATED` | false |
 | `productionLegalGateSatisfied` | false |
-| `PAC_SANDBOX_LIVE_VALIDATED` (nuevo) | false: faltan credenciales |
-| `PAC_RECONCILIATION_LIVE_VALIDATED` (nuevo) | false |
+| `PAC_SANDBOX_LIVE_VALIDATED` (nuevo) | **true**: un timbre real de SW sandbox verificado de punta a punta (§21.1) |
+| `PAC_RECONCILIATION_LIVE_VALIDATED` (nuevo) | **true**: `UNKNOWN` → proceso nuevo → `reconcileStampAttempt` real → SW `307` → mismo UUID → `SUCCEEDED` en vivo (§21.3.2) |
 | `TFD_SAT_SEAL_VERIFIED` (nuevo) | false |
 | `PAC_PRODUCTION_CREDENTIALS` (nuevo) | false |
 | KMS/HSM | pendiente |
@@ -361,8 +589,10 @@ real (gate `PAC_SANDBOX_LIVE_VALIDATED=false`).
 
 ## 24. Riesgos
 
-- Sin evidencia real de SW. La forma de las respuestas sale de la documentación y del SDK; la
-  documentación misma es inconsistente para el CustomID duplicado.
+- Evidencia real de SW: tres timbres, dos `307` de reconciliación (uno por la ruta productiva
+  `reconcileStampAttempt`) y un 401 sin timbre (§21.1, §21.3.1, §21.3.2). Los rechazos y el
+  duplicado `CFDI3307` siguen basados en la documentación y el SDK (nunca observado en vivo);
+  la documentación es inconsistente para el CustomID duplicado.
 - Un `UNKNOWN` dentro de las 72 h del CustomID puede no resolverse hasta que expire. Requiere un
   procedimiento operativo de soporte, sin API de consulta por UUID documentada.
 - Durante la reconciliación, las negativas mantienen `UNKNOWN`. Un CFDI que de verdad nunca se
@@ -371,16 +601,13 @@ real (gate `PAC_SANDBOX_LIVE_VALIDATED=false`).
 - La concurrencia en PostgreSQL real (lock `FOR UPDATE`) se demostró en PGlite, que serializa
   las transacciones.
 - La comparación estructural es estricta: si SW cambiara algo no fiscal (por ejemplo, el
-  `schemaLocation` raíz), el resultado sería `UNKNOWN`, no un éxito. Hay que revisarlo con la
-  prueba real.
+  `schemaLocation` raíz), el resultado sería `UNKNOWN`, no un éxito. En la prueba real SW no
+  cambió nada (§21.1).
 - Los textos de autorización son borradores pendientes de revisión jurídica.
 
 ## 25. Siguiente paso
 
-1. Conseguir las credenciales de pruebas de SW y el CSD de pruebas oficial; autorizar la CA de
-   pruebas del SAT; ejecutar la prueba real única (§21) y cerrar `PAC_SANDBOX_LIVE_VALIDATED` y
-   `PAC_RECONCILIATION_LIVE_VALIDATED`.
-2. Revisar y aplicar la migración en un entorno no productivo (no Neon hasta revisión).
+1. Revisar y aplicar la migración en un entorno no productivo (no Neon hasta revisión).
 3. Fuente oficial del certificado del SAT para `TFD_SAT_SEAL_VERIFIED`.
 4. Fase READY → ISSUED: Document privado del XML timbrado, `StampedInvoice.uuid` e `issuedAt`
    con la fecha de timbrado, PDF, inmutabilidad y separación de sandbox.

@@ -2,10 +2,10 @@
 // which must not pull the CSD custody, HTTP or database modules into its bundle.
 
 /**
- * §M.8 — UNVERIFIED HYPOTHESIS pending official SAT sources and official test CSD: the
- * certificate serial number is 20 bytes, each an ASCII digit, and those digits are the
- * 20-digit NoCertificado. Any other serial is unsupported (step 8). Not verified by the SAT:
- * production waits for gate OFFICIAL_CSD_FIXTURE_VALIDATED (./production-gates.ts).
+ * §M.8: the certificate serial number is 20 bytes, each an ASCII digit, and those digits are
+ * the 20-digit NoCertificado. Any other serial is unsupported (step 8). Validated against
+ * official SAT test CSD and a live SW sandbox stamp (gate OFFICIAL_CSD_FIXTURE_VALIDATED,
+ * ./production-gates.ts); there is still no SAT document that states the rule.
  */
 export function certificateNumberFromSerial(serialNumberHex: string) {
   const hex =

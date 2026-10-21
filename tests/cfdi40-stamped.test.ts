@@ -817,8 +817,10 @@ test("stamped verification code: no network, files, eval or console; the SelloSA
   assert.deepEqual(
     { ...gates.productionPacGates },
     {
-      PAC_SANDBOX_LIVE_VALIDATED: false,
-      PAC_RECONCILIATION_LIVE_VALIDATED: false,
+      // One real SW sandbox stamp verified end to end (FASE5C8 §21) and one real
+      // UNKNOWN → reconcileStampAttempt → same UUID cycle (§21.3.2); the rest stay pending.
+      PAC_SANDBOX_LIVE_VALIDATED: true,
+      PAC_RECONCILIATION_LIVE_VALIDATED: true,
       TFD_SAT_SEAL_VERIFIED: false,
       PAC_PRODUCTION_CREDENTIALS: false,
     },

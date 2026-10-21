@@ -5,10 +5,22 @@
 // PRODUCTION also needs; this phase cannot build a PRODUCTION adapter at all
 // (resolveSwPacConfiguration → PAC_PRODUCTION_BLOCKED).
 export const productionPacGates = Object.freeze({
-  /** One real SW sandbox stamp verified end to end (needs SW_SANDBOX_TOKEN and a test CSD). */
-  PAC_SANDBOX_LIVE_VALIDATED: false,
-  /** SW's real duplicate answers (same CustomID, same Sello) observed and reconciled. */
-  PAC_RECONCILIATION_LIVE_VALIDATED: false,
+  /**
+   * One real SW sandbox stamp verified end to end. Evidence (2026-10-21, FASE5C8 §21): one
+   * POST of an XsdValidatedCfdi40 sealed with the official test CSD EKU9003173C9 → HTTP 200
+   * PAC_STAMPED; TFD 1.1, SelloCFD, cadenaOriginalSAT, unchanged fiscal content and the
+   * CFDI + TFD XSD all verified by ORBIT.
+   */
+  PAC_SANDBOX_LIVE_VALIDATED: true,
+  /**
+   * End to end in the real SW sandbox: a real POST whose outcome ORBIT loses → UNKNOWN →
+   * process restart → reconcileStampAttempt → SW duplicate answer → the same UUID →
+   * SUCCEEDED. Evidence (2026-10-21, FASE5C8 §21.3.2): a fresh process recovered the UNKNOWN
+   * attempt and the real reconcileStampAttempt resent the persisted bytes with the same
+   * CustomID (submissionCount=2 committed first) → SW HTTP 400 code 307 with the earlier CFDI
+   * → PAC_PREVIOUSLY_STAMPED, the same UUID, SUCCEEDED, no new signature.
+   */
+  PAC_RECONCILIATION_LIVE_VALIDATED: true,
   /**
    * SelloSAT verified cryptographically over the TFD cadena with the SAT certificate named by
    * NoCertificadoSAT, from a trusted official source; today only structure and binding are.

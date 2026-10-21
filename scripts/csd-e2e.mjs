@@ -568,30 +568,23 @@ try {
   // Production uses __Secure- session cookies: sign in on this server.
   const p = await account("CsdOwnerProduction");
   await confirmProfile(p.org, p, rfcA);
+  // Fiscal SANDBOX custody is available through the official SAT test CA (AC UAT) only;
+  // the synthetic CA of the harness is ignored, so a synthetic CSD is not a test CSD.
   const production = await json(await p.ctx.get("/api/csd"));
-  assert.equal(production.serviceAvailable, false);
+  assert.equal(production.serviceAvailable, true);
   await coded(
     await configure(p.ctx, material(rfcA)),
-    503,
-    "CSD_SERVICE_UNAVAILABLE",
+    422,
+    "CSD_ENVIRONMENT_MISMATCH",
   );
-  // Custody is rejected before the body is read: an oversized body is not even parsed.
-  await coded(
-    await p.ctx.post("/api/csd", {
-      headers: origin,
-      multipart: {
-        certificate: {
-          name: "certificado.cer",
-          mimeType: "application/octet-stream",
-          buffer: randomBytes(70 * 1024),
-        },
-      },
-    }),
-    503,
-    "CSD_SERVICE_UNAVAILABLE",
+  assert.equal(
+    (await sql(`SELECT 1 FROM "CsdCertificate" WHERE "organizationId"=$1`, [
+      p.org.id,
+    ])).length,
+    0,
   );
   pass(
-    "production build ignores the test CA harness even with every harness variable set: 503 before reading the body",
+    "production build ignores the test CA harness even with every harness variable set: synthetic CSD 422 CSD_ENVIRONMENT_MISMATCH, nothing stored",
   );
 
   // --- Fail closed configurations (production build) -------------------------------
@@ -613,8 +606,6 @@ try {
       },
     ],
     ["no KeyProvider", { ...sandbox, CSD_KEY_PROVIDER_SANDBOX: "" }],
-    ["empty test CA allowlist", { ...sandbox, CSD_E2E_TEST_AUTHORITIES: "" }],
-    ["VERCEL_ENV=production", { ...sandbox, VERCEL_ENV: "production" }],
     [
       "KEK of invalid length",
       { ...sandbox, CSD_KEK_V1: randomBytes(16).toString("base64") },
@@ -630,13 +621,50 @@ try {
       503,
       "CSD_SERVICE_UNAVAILABLE",
     );
+    // Custody is rejected before the body is read: an oversized body is not even parsed.
+    await coded(
+      await p.ctx.post("/api/csd", {
+        headers: origin,
+        multipart: {
+          certificate: {
+            name: "certificado.cer",
+            mimeType: "application/octet-stream",
+            buffer: randomBytes(70 * 1024),
+          },
+        },
+      }),
+      503,
+      "CSD_SERVICE_UNAVAILABLE",
+    );
   }
   assert.equal(
     (await sql(`SELECT 1 FROM "CsdCertificate" WHERE status='ACTIVE'`)).length,
     0,
   );
   pass(
-    "fail closed (503 CSD_SERVICE_UNAVAILABLE): fiscal PRODUCTION, env provider in PRODUCTION, KMS without fallback, no provider, empty allowlist, invalid KEK",
+    "fail closed (503 CSD_SERVICE_UNAVAILABLE): fiscal PRODUCTION, env provider in PRODUCTION, KMS without fallback, no provider, invalid KEK; 503 before reading the body",
+  );
+
+  // VERCEL_ENV never decides custody (the fiscal environment does): in fiscal SANDBOX a
+  // Vercel signal only disables the harness, so the synthetic CA is not a test CA.
+  await stopApp();
+  await startApp("start", { ...sandbox, VERCEL_ENV: "production" });
+  await resetRateLimits();
+  assert.equal(
+    (await json(await p.ctx.get("/api/csd"))).serviceAvailable,
+    true,
+  );
+  await coded(
+    await configure(p.ctx, material(rfcA)),
+    422,
+    "CSD_ENVIRONMENT_MISMATCH",
+  );
+  assert.equal(
+    (await sql(`SELECT 1 FROM "CsdCertificate" WHERE status='ACTIVE'`)).length,
+    0,
+  );
+  pass(
+    "VERCEL_ENV=production in fiscal SANDBOX: harness off, only the official test CA counts; synthetic CSD 422",
   );
 
   // Final sweep over every server (dev and production) and every response.

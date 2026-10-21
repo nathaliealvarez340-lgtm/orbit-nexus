@@ -13,7 +13,7 @@ lo usará el bloque de timbrado después de la autorización por factura (§13).
 | Sello completo | `sealCfdi40WithActiveCsd`: cadena oficial → firma → `Sello` en el mismo árbol pre-sello → verificación del XML final → `SealedCfdi40Xml` |
 | Único constructor de `SealedCfdi40Xml` | `createSealedCfdi40` (`src/lib/cfdi40/sealed.ts`); no registra nada si el sello no verifica |
 | Verificación de un XML sellado | `sealedCfdi40XmlProblems`: recalcula la cadena con la XSLT oficial desde el XML y verifica `Sello` con su `Certificado` |
-| PRODUCTION | **Bloqueado** (fail closed): faltan KMS/HSM, Legal Production Gate y los gates de evidencia `CSD_TYPE_VERIFIED`, `OFFICIAL_CSD_FIXTURE_VALIDATED`, `POSTGRES_CSD_CONCURRENCY_VALIDATED` (§10, `src/lib/csd/production-gates.ts`) |
+| PRODUCTION | **Bloqueado** (fail closed): faltan KMS/HSM, Legal Production Gate y los gates de evidencia `CSD_TYPE_VERIFIED` y `POSTGRES_CSD_CONCURRENCY_VALIDATED` (`OFFICIAL_CSD_FIXTURE_VALIDATED` cerrado en 5C.8) (§10, `src/lib/csd/production-gates.ts`) |
 | Evidencia | OpenSSL CLI, .NET CNG y `node:crypto` producen el **mismo** sello byte a byte; 10 CFDI del PAC sellados con el CSD de prueba del SAT verifican con el verificador de ORBIT (§11) |
 | Matriz de gates | §16 |
 
@@ -238,7 +238,7 @@ falla a propósito si alguna cambia. Solo cambian con la evidencia y autorizaci�
 | Gate | Estado | Qué falta |
 |---|---|---|
 | `CSD_TYPE_VERIFIED` | `false` | Evidencia de que el certificado aceptado para timbrado corresponde realmente a un CSD válido para ese flujo, por un mecanismo verificable (SAT, PAC autorizado u otro oficial/contractual). PRODUCTION **no** se activa solo porque el certificado sea RSA, el RFC coincida y la firma criptográfica funcione. SANDBOX sintético trabaja con un fixture/CA de prueba controlada |
-| `OFFICIAL_CSD_FIXTURE_VALIDATED` | `false` | Ejecutar las reglas de extracción/normalización del RFC (§M.7) y de derivación de `NoCertificado` desde el número de serie (§M.8) contra material oficial de prueba o un fixture de PAC/SAT apto para tests. Hoy son **hipótesis**, no reglas verificadas por el SAT. (Evidencia parcial: el certificado de prueba del SAT incluido en CFDI publicados por el PAC cumple la regla de `NoCertificado`, 5C.5; no sustituye la validación.) Nunca un CSD real de un cliente en el repositorio |
+| `OFFICIAL_CSD_FIXTURE_VALIDATED` | `true` (2026-10-21, FASE5C8 §21.1: CSD oficiales de prueba KIJ0906199R1 y EKU9003173C9 + timbre real en SW sandbox; solo persona moral) | Ejecutar las reglas de extracción/normalización del RFC (§M.7) y de derivación de `NoCertificado` desde el número de serie (§M.8) contra material oficial de prueba o un fixture de PAC/SAT apto para tests. Hoy son **hipótesis**, no reglas verificadas por el SAT. (Evidencia parcial: el certificado de prueba del SAT incluido en CFDI publicados por el PAC cumple la regla de `NoCertificado`, 5C.5; no sustituye la validación.) Nunca un CSD real de un cliente en el repositorio |
 | `POSTGRES_CSD_CONCURRENCY_VALIDATED` | `false` | Probar `FOR SHARE` frente a sustitución/deshabilitado con sesiones concurrentes en PostgreSQL real (§8) |
 
 ## 11. Evidencia
@@ -350,10 +350,10 @@ fallaron hasta regenerar ese artefacto (sin cambios en código ni pruebas).
 | Private-key lifecycle | PASS |
 | XSD oficial | PENDING (PASS en Fase 5C.7: `FASE5C7-XSD-VALIDATION.md`) |
 | CSD type official verification (`CSD_TYPE_VERIFIED`) | PENDING |
-| Official CSD fixture (`OFFICIAL_CSD_FIXTURE_VALIDATED`) | PENDING |
+| Official CSD fixture (`OFFICIAL_CSD_FIXTURE_VALIDATED`) | DONE (FASE5C8 §21.1) |
 | Postgres concurrency (`POSTGRES_CSD_CONCURRENCY_VALIDATED`) | PENDING |
 | KMS/HSM production | PENDING |
-| PAC sandbox | PENDING |
+| PAC sandbox | DONE (FASE5C8 §21: timbre real y reconciliación en SW sandbox) |
 | PAC production | PENDING |
 | READY → ISSUED | PENDING |
 

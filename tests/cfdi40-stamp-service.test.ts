@@ -753,6 +753,124 @@ test("reconciliation: request never arrived → stamped now; CustomID expired �
   );
 });
 
+test("reconciliation boundaries: SUCCEEDED and FAILED are terminal (nothing sent); UNKNOWN reconciles without signing again, with the same CustomID and bytes; a requestSha256 mismatch fails closed", async () => {
+  const request = { expectedVersion: 1, authorization: accepted };
+  // SUCCEEDED is terminal: reconciling returns the state and never calls the PAC.
+  const stamped = await insertInvoice("org-a");
+  const ok = await stampInvoice(prisma, owner, stamped, request, deps());
+  assert.equal(ok.attempt.status, "SUCCEEDED");
+  let calls = fake.calls.length;
+  const again = await reconcileStampAttempt(prisma, owner, stamped, deps());
+  assert.equal(again.attempt.status, "SUCCEEDED");
+  assert.equal(again.attempt.id, ok.attempt.id);
+  assert.equal(fake.calls.length, calls);
+  assert.equal((await attempts(stamped))[0].submissionCount, 1);
+
+  // A known FAILED (explicit rejection) is never re-sent.
+  const rejected = await insertInvoice("org-a", "ingreso-descuento");
+  fake.next = ["reject-fiscal"];
+  assert.equal(
+    (await stampInvoice(prisma, owner, rejected, request, deps())).attempt
+      .status,
+    "FAILED",
+  );
+  calls = fake.calls.length;
+  const stillFailed = await reconcileStampAttempt(
+    prisma,
+    owner,
+    rejected,
+    deps(),
+  );
+  assert.equal(stillFailed.attempt.status, "FAILED");
+  assert.equal(fake.calls.length, calls);
+
+  // UNKNOWN: reconciled from the persisted bytes only. Custody under another KEK cannot open
+  // the CSD, so the stamp below proves nothing was signed again.
+  const lost = await insertInvoice("org-a", "ingreso-persona-fisica");
+  fake.next = ["lost-after-stamp"];
+  await stampInvoice(prisma, owner, lost, request, deps());
+  const [before] = await attempts(lost);
+  assert.equal(before.status, "UNKNOWN");
+  const sealedEvents = async () =>
+    (
+      await sql(
+        `SELECT COUNT(*)::int n FROM "AuditEvent" WHERE "targetId"=$1 AND action='cfdi.sealed'`,
+        [lost],
+      )
+    )[0].n;
+  assert.equal(await sealedEvents(), 1);
+  fake.duplicateCustomId = "full";
+  calls = fake.calls.length;
+  const otherKek = resolveCustody(
+    { ...env, CSD_KEK_V1: randomBytes(32).toString("base64") },
+    authorities,
+  );
+  const resolved = await reconcileStampAttempt(
+    prisma,
+    owner,
+    lost,
+    deps({ custody: otherKek }),
+  );
+  assert.equal(resolved.attempt.status, "SUCCEEDED");
+  assert.equal(fake.calls.length, calls + 1);
+  const call = fake.calls.at(-1)!;
+  assert.equal(call.customId, before.customId);
+  assert.equal(call.sha256, before.requestSha256);
+  const [after] = await attempts(lost);
+  assert.equal(after.id, before.id);
+  assert.equal(after.customId, before.customId);
+  assert(Buffer.from(after.sealedXml!).equals(Buffer.from(before.sealedXml!)));
+  assert.equal(after.submissionCount, 2);
+  assert.equal(await sealedEvents(), 1, "no new seal during reconciliation");
+
+  // requestSha256 that does not match the stored bytes: the CHECK refuses it even below the
+  // triggers; with the CHECK lifted, the service itself refuses to send.
+  const mismatch = await insertInvoice("org-a", "ingreso-rfc-generico-nacional");
+  fake.next = ["lost-before"];
+  await stampInvoice(prisma, owner, mismatch, request, deps());
+  const [row] = await attempts(mismatch);
+  assert.equal(row.status, "UNKNOWN");
+  const wrong = createHash("sha256").update("not the request").digest("hex");
+  await assert.rejects(
+    belowTriggers(`UPDATE "StampAttempt" SET "requestSha256"=$1 WHERE id=$2`, [
+      wrong,
+      row.id,
+    ]),
+    /StampAttempt_request_pinned_check/,
+  );
+  const [{ definition }] = (await sql(
+    `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname='StampAttempt_request_pinned_check'`,
+  )) as { definition: string }[];
+  await database.db.exec(
+    `ALTER TABLE "StampAttempt" DROP CONSTRAINT "StampAttempt_request_pinned_check"`,
+  );
+  try {
+    await belowTriggers(
+      `UPDATE "StampAttempt" SET "requestSha256"=$1 WHERE id=$2`,
+      [wrong, row.id],
+    );
+    calls = fake.calls.length;
+    const refused = await reconcileStampAttempt(
+      prisma,
+      owner,
+      mismatch,
+      deps(),
+    );
+    assert.equal(refused.attempt.status, "UNKNOWN");
+    assert.equal(refused.attempt.error?.code, "STORED_REQUEST_CORRUPT");
+    assert.equal(fake.calls.length, calls);
+  } finally {
+    await belowTriggers(
+      `UPDATE "StampAttempt" SET "requestSha256"=$1 WHERE id=$2`,
+      [row.requestSha256, row.id],
+    );
+    await database.db.exec(
+      `ALTER TABLE "StampAttempt" ADD CONSTRAINT "StampAttempt_request_pinned_check" ${definition}`,
+    );
+  }
+  assert.equal((await attempts(mismatch))[0].customId, row.customId);
+});
+
 test("a stamp ORBIT cannot verify is UNKNOWN (never FAILED); a UUID already in ORBIT is never assigned twice", async () => {
   const request = { expectedVersion: 1, authorization: accepted };
   const altered = await insertInvoice("org-a", "ingreso-unicode-escape");
@@ -918,7 +1036,17 @@ test("stale attempts: nothing sent → FAILED; possibly sent → UNKNOWN; pre-su
   assert.equal(fake.calls.length, calls);
 });
 
-test("reconciliation refuses tampered stored bytes: UNKNOWN STORED_REQUEST_CORRUPT and nothing is sent", async () => {
+/** Writes below the immutability triggers (simulated storage corruption); CHECKs still apply. */
+async function belowTriggers(statement: string, params: unknown[]) {
+  await database.db.exec("SET session_replication_role = replica");
+  try {
+    return await database.db.query(statement, params);
+  } finally {
+    await database.db.exec("SET session_replication_role = origin");
+  }
+}
+
+test("reconciliation refuses tampered stored bytes: the database refuses the change; corruption below it → UNKNOWN STORED_REQUEST_CORRUPT and nothing is sent", async () => {
   const invoiceId = await insertInvoice("org-a", "ingreso-descuento");
   fake.next = ["lost-before"];
   await stampInvoice(
@@ -929,23 +1057,43 @@ test("reconciliation refuses tampered stored bytes: UNKNOWN STORED_REQUEST_CORRU
     deps(),
   );
   const [row] = await attempts(invoiceId);
-  const tampered = Buffer.from(row.sealedXml!)
-    .toString("utf8")
-    .replace(/Total="([0-9.]+)"/, 'Total="1.00"');
-  await prisma.stampAttempt.update({
-    where: { id: row.id },
-    data: { sealedXml: new Uint8Array(Buffer.from(tampered)) },
-  });
+  const tampered = Buffer.from(
+    Buffer.from(row.sealedXml!)
+      .toString("utf8")
+      .replace(/Total="([0-9.]+)"/, 'Total="1.00"'),
+  );
+  const tamperedSha256 = createHash("sha256").update(tampered).digest("hex");
+  // The persisted request is immutable (trigger) and pinned by its hash (CHECK).
+  await assert.rejects(
+    prisma.stampAttempt.update({
+      where: { id: row.id },
+      data: { sealedXml: new Uint8Array(tampered) },
+    }),
+    /STAMP_ATTEMPT_REQUEST_IMMUTABLE/,
+  );
+  await assert.rejects(
+    belowTriggers(`UPDATE "StampAttempt" SET "sealedXml"=$1 WHERE id=$2`, [
+      tampered,
+      row.id,
+    ]),
+    /StampAttempt_request_pinned_check/,
+  );
+  // Corrupted below the triggers with a consistent hash: the restore still refuses it (the
+  // signed cadena and the Sello no longer match), so nothing is sent.
+  await belowTriggers(
+    `UPDATE "StampAttempt" SET "sealedXml"=$1, "requestSha256"=$2 WHERE id=$3`,
+    [tampered, tamperedSha256, row.id],
+  );
   const calls = fake.calls.length;
   const result = await reconcileStampAttempt(prisma, owner, invoiceId, deps());
   assert.equal(result.attempt.status, "UNKNOWN");
   assert.equal(result.attempt.error?.code, "STORED_REQUEST_CORRUPT");
   assert.equal(fake.calls.length, calls);
   // Restoring the exact bytes makes it reconcilable again.
-  await prisma.stampAttempt.update({
-    where: { id: row.id },
-    data: { sealedXml: row.sealedXml },
-  });
+  await belowTriggers(
+    `UPDATE "StampAttempt" SET "sealedXml"=$1, "requestSha256"=$2 WHERE id=$3`,
+    [Buffer.from(row.sealedXml!), row.requestSha256, row.id],
+  );
   assert.equal(
     (await reconcileStampAttempt(prisma, owner, invoiceId, deps())).attempt
       .status,

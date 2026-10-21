@@ -42,10 +42,15 @@ const time = (date) => {
     : der(0x18, Buffer.from(digits + "Z"));
 };
 const sha256WithRsa = sequence(oid("1.2.840.113549.1.1.11"), der(0x05));
+// A Buffer is an already encoded DER Name, copied byte for byte (impostor CA tests).
 const name = (attributes) =>
-  sequence(
-    ...attributes.map(([type, value]) => set(sequence(oid(type), utf8(value)))),
-  );
+  Buffer.isBuffer(attributes)
+    ? attributes
+    : sequence(
+        ...attributes.map(([type, value]) =>
+          set(sequence(oid(type), utf8(value))),
+        ),
+      );
 
 /** X.509 v3 DER signed with RSA-SHA256 by `signingKey`. */
 export function syntheticCertificate({
@@ -82,12 +87,20 @@ export function syntheticCertificate({
 
 const day = 24 * 3600 * 1000;
 
-/** Synthetic CA. Never an official SAT or PAC authority. */
-export function syntheticAuthority(label = "AC SINTETICA DE PRUEBAS") {
+/**
+ * Synthetic CA. Never an official SAT or PAC authority. `rawSubject` (DER Name) makes an
+ * impostor with exactly the subject of a real CA but its own key.
+ * @param {string} [label]
+ * @param {{ rawSubject?: Buffer }} [options]
+ */
+export function syntheticAuthority(
+  label = "AC SINTETICA DE PRUEBAS",
+  { rawSubject } = {},
+) {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
   });
-  const subject = [
+  const subject = rawSubject ?? [
     ["2.5.4.3", label + " NO SAT"],
     ["2.5.4.10", "ORBIT NEXUS PRUEBAS SINTETICAS"],
   ];

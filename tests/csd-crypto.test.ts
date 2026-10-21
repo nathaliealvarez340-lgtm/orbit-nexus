@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   X509Certificate,
+  createHash,
   createPrivateKey,
   generateKeyPairSync,
   randomBytes,
@@ -79,7 +80,15 @@ const sandboxEnv = (extra: Record<string, string> = {}) => ({
   ...extra,
 });
 
-function upload(material = csd, overrides: Partial<CsdUpload> = {}): CsdUpload {
+type CsdMaterial = {
+  certificate: Uint8Array;
+  privateKey: Uint8Array;
+  password: string;
+};
+function upload(
+  material: CsdMaterial = csd,
+  overrides: Partial<CsdUpload> = {},
+): CsdUpload {
   return {
     certificate: {
       name: "certificado.cer",
@@ -363,6 +372,20 @@ test("upload checks: files, password, custody terms, size and extension", () => 
   );
 });
 
+// Official SAT test CA "AC UAT" (2022), the only entry of the official allowlist.
+const acUatSha256 =
+  "ff9c220344614c06fa483b846d7959f9ba0806dfa85610f4ace3b2df8aefacf9";
+const officialCas = testAuthorities({});
+const fingerprint = (certificate: X509Certificate) =>
+  certificate.fingerprint256.replace(/:/g, "").toLowerCase();
+/** DER of the subject Name of a certificate, byte for byte. */
+function rawSubject(certificate: Buffer) {
+  const [tbs] = children(certificate, readDocument(certificate));
+  const fields = children(certificate, tbs);
+  const subject = fields[(fields[0].tag === 0xa0 ? 1 : 0) + 4];
+  return certificate.subarray(subject.start, subject.end);
+}
+
 test("§M.0: SANDBOX accepts only certificates signed by an allowlisted test CA", () => {
   const other = syntheticAuthority("OTRA AC SINTETICA");
   const foreign = syntheticCsd(other);
@@ -390,7 +413,185 @@ test("§M.0: SANDBOX accepts only certificates signed by an allowlisted test CA"
     "CSD_ENVIRONMENT_MISMATCH",
     "8b",
   );
-  assert.deepEqual(officialTestAuthorities, []);
+  // The official allowlist never makes a synthetic certificate a test certificate.
+  rejects(
+    () =>
+      validateCsdUpload(upload(), { ...options, authorities: officialCas }),
+    "CSD_ENVIRONMENT_MISMATCH",
+    "8b",
+  );
+});
+
+test("§M.0 official allowlist: only the pinned SAT test CA AC UAT, a CA, never a CSD", () => {
+  assert.equal(officialTestAuthorities.length, 1);
+  const [entry] = officialTestAuthorities;
+  assert.equal(entry.sha256, acUatSha256);
+  assert.match(entry.sourceUrl, /^https?:\/\/omawww\.sat\.gob\.mx\//);
+  assert.match(entry.retrievedAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(officialCas.length, 1);
+  const [ca] = officialCas;
+  assert.equal(fingerprint(ca), acUatSha256);
+  assert.equal(ca.ca, true);
+  assert.equal(ca.subject, entry.subject);
+  assert.match(ca.subject, /^CN=AC UAT\nO=SERVICIO DE ADMINISTRACION TRIBUTARIA/);
+  assert.equal(ca.serialNumber.toUpperCase(), entry.serialNumberHex);
+  assert.equal(ca.publicKey.asymmetricKeyDetails?.modulusLength, 4096);
+  assert.equal(ca.verify(ca.publicKey), false, "an intermediate, not a root");
+  // The official entry does not depend on the E2E harness or on NODE_ENV.
+  assert.deepEqual(testAuthorities({ NODE_ENV: "production" }).map(fingerprint), [
+    acUatSha256,
+  ]);
+});
+
+test("§M.0 impostor CA with exactly the AC UAT subject and another key is rejected", () => {
+  const subject = rawSubject(Buffer.from(officialCas[0].raw));
+  const impostor = syntheticAuthority("AC UAT IMPOSTOR", { rawSubject: subject });
+  const impostorX509 = new X509Certificate(impostor.certificate);
+  assert.equal(impostorX509.subject, officialCas[0].subject);
+  assert.equal(impostorX509.ca, true);
+  const forged = syntheticCsd(impostor);
+  const forgedX509 = new X509Certificate(forged.certificate);
+  // Same issuer name as the official CA: the name matches, the signature does not.
+  assert.equal(forgedX509.checkIssued(officialCas[0]), true);
+  assert.equal(forgedX509.verify(officialCas[0].publicKey), false);
+  rejects(
+    () =>
+      validateCsdUpload(upload(forged), { ...options, authorities: officialCas }),
+    "CSD_ENVIRONMENT_MISMATCH",
+    "8b",
+  );
+  // A test CA, even one with the official subject, never makes a certificate PRODUCTION.
+  rejects(
+    () =>
+      validateCsdUpload(upload(forged), {
+        ...options,
+        authorities: [...officialCas, impostorX509],
+        environment: "PRODUCTION",
+      }),
+    "CSD_ENVIRONMENT_MISMATCH",
+    "8b",
+  );
+});
+
+// SW sandbox / SAT official TEST CSD (2023-05-18 batch, issued by AC UAT 2022), read from the
+// paths in these variables only when they are present (never copied to the repository).
+// Without them this test is skipped and says so. The expected facts are pinned per
+// certificate SHA-256; any other certificate fails instead of being trusted.
+const officialCsdPresent = Boolean(
+  process.env.SW_TEST_CSD_CER &&
+    process.env.SW_TEST_CSD_KEY &&
+    process.env.SW_TEST_CSD_PASSWORD,
+);
+const officialTestCsds: Record<
+  string,
+  { rfc: string; certificateNumber: string; validFrom: string; validTo: string }
+> = {
+  // KIJ0906199R1 (Sucursal 1).
+  "90561071e99cc75321bb1dfdebc847e5e80473e1539e7f8a4297b5d0de870545": {
+    rfc: "KIJ0906199R1",
+    certificateNumber: "30001000000500003437",
+    validFrom: "2023-05-18T12:52:53Z",
+    validTo: "2027-05-18T12:52:53Z",
+  },
+  // EKU9003173C9 (ESCUELA KEMPER URGATE, Sucursal 1): stamped live in the SW sandbox (5C.8).
+  "92be3ef448e0fd01467f3b0cbd8e77b568d84ea58f22f5afa400b2ec99bbbb53": {
+    rfc: "EKU9003173C9",
+    certificateNumber: "30001000000500003416",
+    validFrom: "2023-05-18T11:43:51Z",
+    validTo: "2027-05-18T11:43:51Z",
+  },
+};
+test(
+  "§M.0 official SAT test CSD (KIJ0906199R1 or EKU9003173C9): accepted in SANDBOX, rejected in PRODUCTION and outside its validity",
+  {
+    skip: officialCsdPresent
+      ? false
+      : "SW_TEST_CSD_CER/SW_TEST_CSD_KEY/SW_TEST_CSD_PASSWORD not set",
+  },
+  () => {
+    const official = {
+      certificate: readFileSync(process.env.SW_TEST_CSD_CER!),
+      privateKey: readFileSync(process.env.SW_TEST_CSD_KEY!),
+      password: process.env.SW_TEST_CSD_PASSWORD!,
+    };
+    const certificateSha256 = createHash("sha256")
+      .update(official.certificate)
+      .digest("hex");
+    const expected = officialTestCsds[certificateSha256];
+    assert(expected, "not a known official SAT test CSD");
+    const officialOptions = {
+      profileRfc: expected.rfc,
+      environment: "SANDBOX" as const,
+      authorities: officialCas,
+      now: new Date("2026-10-21T12:00:00Z"),
+    };
+    const result = validateCsdUpload(upload(official), officialOptions);
+    try {
+      // §M.7 RFC from x500UniqueIdentifier; §M.8 NoCertificado from the ASCII serial.
+      assert.equal(result.certificate.rfc, expected.rfc);
+      assert.equal(
+        result.certificate.certificateNumber,
+        expected.certificateNumber,
+      );
+      assert.equal(result.certificate.publicKeyBits, 2048);
+      assert.equal(result.certificate.sha256, certificateSha256);
+    } finally {
+      result.pkcs8.fill(0);
+    }
+    rejects(
+      () =>
+        validateCsdUpload(upload(official), {
+          ...officialOptions,
+          environment: "PRODUCTION",
+        }),
+      "CSD_ENVIRONMENT_MISMATCH",
+      "8b",
+    );
+    rejects(
+      () => validateCsdUpload(upload(official), { ...officialOptions, authorities: [] }),
+      "CSD_ENVIRONMENT_MISMATCH",
+      "8b",
+    );
+    rejects(
+      () =>
+        validateCsdUpload(upload(official), {
+          ...officialOptions,
+          now: new Date(expected.validTo),
+        }),
+      "CSD_EXPIRED",
+      6,
+    );
+    rejects(
+      () =>
+        validateCsdUpload(upload(official), {
+          ...officialOptions,
+          now: new Date(new Date(expected.validFrom).getTime() - 1000),
+        }),
+      "CSD_NOT_YET_VALID",
+      6,
+    );
+    rejects(
+      () =>
+        validateCsdUpload(upload(official), {
+          ...officialOptions,
+          profileRfc: "SCA010101AB1",
+        }),
+      "CSD_RFC_MISMATCH",
+      7,
+    );
+  },
+);
+
+test("§M.0 expired certificate signed by an allowlisted CA is still rejected", () => {
+  const expired = syntheticCsd(authority, {
+    validFrom: new Date(Date.now() - 400 * 24 * 3600 * 1000),
+    validTo: new Date(Date.now() - 24 * 3600 * 1000),
+  });
+  rejects(
+    () => validateCsdUpload(upload(expired), options),
+    "CSD_EXPIRED",
+    6,
+  );
 });
 
 test("private key: encrypted PKCS#8 DER, password, algorithm and pair checks", () => {
@@ -776,19 +977,21 @@ test("E2E test CA harness: only with ALL local conditions; any real-environment 
     CSD_E2E_TEST_AUTHORITIES: encoded,
     DATABASE_URL: "postgresql://" + "127.0.0.1:5432/postgres",
   };
-  assert.deepEqual(officialTestAuthorities, []);
-  assert.deepEqual(testAuthorities({}), []);
-  // Positive control: the local harness of scripts/csd-e2e.mjs.
+  // Without the harness only the official SAT test CA is allowlisted.
+  const officialOnly = [acUatSha256];
+  assert.deepEqual(testAuthorities({}).map(fingerprint), officialOnly);
+  const withSynthetic = [...officialOnly, fingerprint(authorityX509)];
+  // Positive control: the local harness of scripts/csd-e2e.mjs adds the synthetic CA.
   assert.equal(e2eHarnessEnabled(harness), true);
-  assert.equal(testAuthorities(harness).length, 1);
-  assert.equal(
+  assert.deepEqual(testAuthorities(harness).map(fingerprint), withSynthetic);
+  assert.deepEqual(
     testAuthorities({
       ...harness,
       NODE_ENV: "development",
       PAC_ENVIRONMENT: "SANDBOX",
       DATABASE_URL: "postgres://" + "[::1]:5432/postgres",
-    }).length,
-    1,
+    }).map(fingerprint),
+    withSynthetic,
   );
   assert.equal(resolveCustody({ ...sandboxEnv(), ...harness }).available, true);
   const disabled: [string, Record<string, string | undefined>][] = [
@@ -833,12 +1036,16 @@ test("E2E test CA harness: only with ALL local conditions; any real-environment 
   for (const [label, change] of disabled) {
     const env = { ...harness, ...change };
     assert.equal(e2eHarnessEnabled(env), false, label);
-    assert.deepEqual(testAuthorities(env), [], label);
+    assert.deepEqual(testAuthorities(env).map(fingerprint), officialOnly, label);
     // Without the harness a synthetic certificate is never a demonstrated test CSD.
-    assert.equal(
-      resolveCustody({ ...sandboxEnv(), ...env }).available,
-      false,
-      label,
+    rejects(
+      () =>
+        validateCsdUpload(upload(), {
+          ...options,
+          authorities: resolveCustody({ ...sandboxEnv(), ...env }).authorities,
+        }),
+      "CSD_ENVIRONMENT_MISMATCH",
+      "8b",
     );
   }
   // A production runtime (process NODE_ENV) disables it whatever the given variables say;
@@ -848,12 +1055,12 @@ test("E2E test CA harness: only with ALL local conditions; any real-environment 
   try {
     processEnv.NODE_ENV = "production";
     assert.equal(e2eHarnessEnabled(harness), false);
-    assert.deepEqual(testAuthorities(harness), []);
+    assert.deepEqual(testAuthorities(harness).map(fingerprint), officialOnly);
   } finally {
     if (previous === undefined) delete processEnv.NODE_ENV;
     else processEnv.NODE_ENV = previous;
   }
-  // A non-CA certificate invalidates the whole injected list.
+  // A non-CA certificate invalidates the whole list, official CA included (fail closed).
   assert.deepEqual(
     testAuthorities({
       ...harness,

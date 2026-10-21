@@ -2,6 +2,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketHandler } from "@electric-sql/pglite-socket";
 import { createServer } from "node:net";
 import { readdir, readFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 
 // Extended-query messages: Parse, Bind, Describe, Execute, Close, Flush. They form one unit
 // with the Sync that follows them.
@@ -94,11 +95,19 @@ class SessionQueue {
   }
 }
 
+/**
+ * @param {boolean | string} persistent false: in memory; true: .orbit-local/postgres; a string:
+ *   that data directory (e.g. a temporary one), so another process can reopen the same database.
+ */
 export async function startDatabase(persistent = false) {
-  if (persistent) await mkdir(".orbit-local", { recursive: true });
-  const db = await PGlite.create(
-    persistent ? ".orbit-local/postgres" : undefined,
-  );
+  const dataDir =
+    typeof persistent === "string"
+      ? persistent
+      : persistent
+        ? ".orbit-local/postgres"
+        : undefined;
+  if (dataDir) await mkdir(dirname(dataDir), { recursive: true });
+  const db = await PGlite.create(dataDir);
   await db.exec(
     'CREATE TABLE IF NOT EXISTS "_orbit_local_migrations" ("name" TEXT PRIMARY KEY)',
   );

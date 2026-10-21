@@ -752,21 +752,21 @@ test("signing code: no network, files, processes, eval, console, key cache or ke
 
 // --- Production gates ---------------------------------------------------------------------
 
-test("fiscal PRODUCTION signing stays blocked: every evidence gate is pending and none is waived", () => {
+test("fiscal PRODUCTION signing stays blocked: the remaining evidence gates are pending and none is waived", () => {
   // Changing any of these needs the evidence in docs/tasks/FASE5C6-CSD-SIGNING.md §10 and
   // explicit authorization; this test fails on purpose when one changes.
+  // OFFICIAL_CSD_FIXTURE_VALIDATED: official SAT test CSD + live SW sandbox stamp (FASE5C8 §21).
   assert.deepEqual(
     { ...productionSigningGates },
     {
       CSD_TYPE_VERIFIED: false,
-      OFFICIAL_CSD_FIXTURE_VALIDATED: false,
+      OFFICIAL_CSD_FIXTURE_VALIDATED: true,
       POSTGRES_CSD_CONCURRENCY_VALIDATED: false,
     },
   );
   assert(Object.isFrozen(productionSigningGates));
   assert.deepEqual(pendingProductionSigningGates(), [
     "CSD_TYPE_VERIFIED",
-    "OFFICIAL_CSD_FIXTURE_VALIDATED",
     "POSTGRES_CSD_CONCURRENCY_VALIDATED",
   ]);
   // Only all three together clear this part of the gate (KMS/HSM and the Legal gate are

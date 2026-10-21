@@ -85,11 +85,11 @@ export function assertWithinValidity(info: CertificateInfo, now: Date) {
 }
 
 /**
- * §M.7 — UNVERIFIED HYPOTHESIS pending official SAT sources and official test CSD: the
- * taxpayer RFC is the first "/"-separated token of the single subject attribute
+ * §M.7: the taxpayer RFC is the first "/"-separated token of the single subject attribute
  * x500UniqueIdentifier (OID 2.5.4.45), encoded as a string (persona moral:
- * "<RFC moral> / <RFC representante>"). Anything else is unverifiable: never guessed. Not
- * verified by the SAT: production waits for gate OFFICIAL_CSD_FIXTURE_VALIDATED.
+ * "<RFC moral> / <RFC representante>"). Anything else is unverifiable: never guessed.
+ * Validated against official SAT test CSD (persona moral only) and a live SW sandbox stamp
+ * (gate OFFICIAL_CSD_FIXTURE_VALIDATED); there is still no SAT document that states the rule.
  */
 export const rfcAttributeOid = "2.5.4.45";
 const rfcPattern = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
@@ -115,7 +115,7 @@ export function assertCertificateRfc(der: Uint8Array, profileRfc: string) {
   return rfc;
 }
 
-// §M.8 (unverified hypothesis): NoCertificado from the serial number; see certificate-number.ts.
+// §M.8: NoCertificado from the serial number; see certificate-number.ts.
 export { certificateNumberFromSerial };
 
 export function assertCertificateNumber(info: CertificateInfo) {

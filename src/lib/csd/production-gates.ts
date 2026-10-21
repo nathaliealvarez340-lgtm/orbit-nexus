@@ -14,8 +14,12 @@ export const productionSigningGates = Object.freeze({
   /**
    * RFC extraction (FASE5C3 §M.7) and NoCertificado derivation (§M.8) validated against
    * official test CSD material or a PAC/SAT fixture fit for tests (never a customer's CSD).
+   * Evidence (2026-10-21, FASE5C8 §21): both rules give the published RFC and NoCertificado
+   * of the SAT test CSD KIJ0906199R1 and EKU9003173C9 (AC UAT 2022), and the SW sandbox
+   * stamped a CFDI whose Emisor/@Rfc and @NoCertificado came from them, returning the same
+   * noCertificadoCFDI. Only persona moral subjects are covered by that material.
    */
-  OFFICIAL_CSD_FIXTURE_VALIDATED: false,
+  OFFICIAL_CSD_FIXTURE_VALIDATED: true,
   /**
    * FOR SHARE (signing) against the UPDATE of a replacement or disable verified on a real
    * PostgreSQL with concurrent sessions; PGlite serializes transactions and cannot prove it.
